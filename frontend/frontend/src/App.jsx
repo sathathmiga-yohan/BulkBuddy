@@ -1,15 +1,22 @@
-import "./App.css";
+import { Routes, Route } from "react-router-dom";
+
 import Navbar from "./components/Navbar/Navbar";
 import Footer from "./components/Footer/Footer";
+import Home from "./pages/Home/Home";
+
+import "./App.css";
 
 function App() {
   return (
     <div className="app">
       <Navbar />
-      <div className="container py-5">
-        <h1>BulkBuddy</h1>
-        <p>Buy Together. Save More.</p>
+
+      <div className="app-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+        </Routes>
       </div>
+
       <Footer />
     </div>
   );
