@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../../services/api";
 import "./Login.css";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -19,11 +22,51 @@ function Login() {
     }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    // Backend connection will be added later.
-    console.log("Login data:", formData);
+    try {
+      const loginData = new URLSearchParams();
+
+      loginData.append("username", formData.email);
+      loginData.append("password", formData.password);
+
+      const response = await api.post(
+        "/auth/login",
+        loginData,
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+
+      localStorage.setItem(
+        "token",
+        response.data.access_token
+      );
+
+      const userResponse = await api.get("/auth/me");
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(userResponse.data)
+      );
+
+      alert("Login successful");
+
+      if (userResponse.data.role === "SELLER") {
+        navigate("/seller");
+      } else {
+        navigate("/deals");
+      }
+    } catch (error) {
+      const message =
+        error.response?.data?.detail ||
+        "Login failed";
+
+      alert(message);
+    }
   };
 
   return (

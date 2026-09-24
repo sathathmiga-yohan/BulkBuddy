@@ -1,0 +1,136 @@
+.seller-deals-page {
+  min-height: 100vh;
+  padding: 60px 0 90px;
+  background: #f8fafc;
+}
+
+.seller-deals-header {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+
+.seller-deals-header span {
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.seller-deals-header h1 {
+  margin: 7px 0;
+  color: #111827;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+
+.seller-deals-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.seller-new-deal {
+  padding: 11px 18px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.seller-new-deal:hover {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.seller-deals-table-wrapper {
+  overflow-x: auto;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.seller-deals-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.seller-deals-table th,
+.seller-deals-table td {
+  padding: 17px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.seller-deals-table th {
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.seller-deals-table td {
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.seller-product-name {
+  color: #111827 !important;
+  font-weight: 700;
+}
+
+.seller-deal-status {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.seller-deal-status.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.seller-deal-status.successful {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.seller-deal-status.failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.seller-deal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.seller-deal-actions a,
+.seller-deal-actions button {
+  padding: 7px 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.78rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.seller-deal-actions a:hover,
+.seller-deal-actions button:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+@media (max-width: 650px) {
+  .seller-deals-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
