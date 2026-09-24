@@ -1,0 +1,175 @@
+.bulk-navbar {
+  width: 100%;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.navbar-container {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+/* =========================
+   Logo
+========================= */
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.brand-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.brand-name {
+  display: flex;
+  align-items: center;
+}
+
+.brand-bulk {
+  color: #1f2937;
+}
+
+.brand-buddy {
+  color: #2563eb;
+}
+
+/* =========================
+   Navigation Links
+========================= */
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.nav-link {
+  color: #4b5563;
+  font-size: 0.98rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: #2563eb;
+}
+
+.active-link {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* =========================
+   Login / Register
+========================= */
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.login-link {
+  color: #374151;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.login-link:hover {
+  color: #2563eb;
+}
+
+.register-button {
+  background-color: #2563eb;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.register-button:hover {
+  background-color: #1d4ed8;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* =========================
+   Tablet
+========================= */
+
+@media (max-width: 768px) {
+  .navbar-container {
+    min-height: auto;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  .navbar-brand {
+    font-size: 1.5rem;
+  }
+
+  .brand-icon {
+    font-size: 1.6rem;
+  }
+
+  .navbar-links {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    gap: 30px;
+    padding-top: 10px;
+  }
+
+  .navbar-actions {
+    gap: 12px;
+  }
+
+  .register-button {
+    padding: 8px 14px;
+  }
+}
+
+/* =========================
+   Mobile
+========================= */
+
+@media (max-width: 480px) {
+  .login-link {
+    display: none;
+  }
+
+  .navbar-links {
+    gap: 22px;
+  }
+
+  .navbar-brand {
+    font-size: 1.35rem;
+  }
+
+  .brand-icon {
+    font-size: 1.5rem;
+  }
+}
