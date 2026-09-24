@@ -1,0 +1,192 @@
+.deals-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+/* =========================
+   Header
+========================= */
+
+.deals-header {
+  padding: 75px 0;
+  background: #eff6ff;
+  text-align: center;
+}
+
+.deals-header .container {
+  max-width: 760px;
+}
+
+.deals-label {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #2563eb;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.deals-header h1 {
+  margin: 0 0 15px;
+  color: #111827;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+}
+
+.deals-header p {
+  max-width: 620px;
+  margin: 0 auto;
+  color: #6b7280;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+/* =========================
+   Content
+========================= */
+
+.deals-content {
+  padding: 60px 0 90px;
+}
+
+/* =========================
+   Toolbar
+========================= */
+
+.deals-toolbar {
+  margin-bottom: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+}
+
+.deals-search {
+  width: 100%;
+  max-width: 440px;
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  color: #6b7280;
+  font-size: 1.2rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.deals-search input {
+  width: 100%;
+  padding: 12px 15px 12px 43px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.deals-search input::placeholder {
+  color: #9ca3af;
+}
+
+.deals-search input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.deal-count {
+  color: #6b7280;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* =========================
+   Deal Grid
+========================= */
+
+.all-deals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+}
+
+/* =========================
+   Empty State
+========================= */
+
+.no-deals {
+  padding: 70px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.no-deals-icon {
+  margin-bottom: 15px;
+  font-size: 3rem;
+}
+
+.no-deals h2 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 1.4rem;
+}
+
+.no-deals p {
+  margin: 0 0 20px;
+  color: #6b7280;
+}
+
+.no-deals button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.no-deals button:hover {
+  background: #1d4ed8;
+}
+
+/* =========================
+   Responsive
+========================= */
+
+@media (max-width: 992px) {
+  .all-deals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .deals-header {
+    padding: 55px 0;
+  }
+
+  .deals-content {
+    padding: 45px 0 65px;
+  }
+
+  .deals-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .deals-search {
+    max-width: 100%;
+  }
+
+  .all-deals-grid {
+    grid-template-columns: 1fr;
+  }
+}

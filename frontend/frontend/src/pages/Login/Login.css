@@ -147,3 +147,29 @@
     font-size: 1.6rem;
   }
 }
+
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 50px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  padding: 4px;
+  border: none;
+  background: transparent;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.password-toggle:hover {
+  opacity: 0.7;
+}
