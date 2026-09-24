@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load SQLAlchemy models
+from app.models.user import User
+from app.models.deal import Deal
+from app.models.participation import Participation
+
 from app.routers import (
     auth,
     deals,
