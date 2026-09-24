@@ -20,10 +20,8 @@ router = APIRouter(
     tags=["Authentication"]
 )
 
-
-# =========================
 # REGISTER
-# =========================
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -70,9 +68,9 @@ def register(
     return new_user
 
 
-# =========================
+
 # LOGIN
-# =========================
+
 @router.post(
     "/login",
     response_model=TokenResponse
@@ -81,7 +79,7 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    # OAuth2 form calls this field "username".
+
     # We use the email address as the username.
     user = db.scalar(
         select(User).where(
@@ -125,10 +123,7 @@ def login(
         "token_type": "bearer"
     }
 
-
-# =========================
 # CURRENT USER
-# =========================
 @router.get(
     "/me",
     response_model=UserResponse

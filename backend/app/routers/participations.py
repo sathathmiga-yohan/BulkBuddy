@@ -28,9 +28,7 @@ router = APIRouter(
 )
 
 
-# ==========================================
 # CUSTOMER - JOIN DEAL
-# ==========================================
 @router.post(
     "/deals/{deal_id}/join",
     response_model=ParticipationResponse,
@@ -41,9 +39,7 @@ def join_deal(
     current_user: User = Depends(require_customer),
     db: Session = Depends(get_db)
 ):
-    # Lock deal row during join.
-    # This helps prevent two customers
-    # taking the last available slot.
+
     deal = db.scalar(
         select(Deal)
         .where(Deal.id == deal_id)
@@ -131,9 +127,7 @@ def join_deal(
     return new_participation
 
 
-# ==========================================
 # CUSTOMER - LEAVE DEAL
-# ==========================================
 @router.delete(
     "/deals/{deal_id}/leave",
     response_model=ParticipationResponse
@@ -203,9 +197,7 @@ def leave_deal(
     return participation
 
 
-# ==========================================
 # CUSTOMER - MY JOINED DEALS
-# ==========================================
 @router.get(
     "/participations/my-deals",
     response_model=list[DealResponse]
@@ -236,10 +228,7 @@ def get_my_joined_deals(
         for deal in deals
     ]
 
-
-# ==========================================
 # SELLER - VIEW PARTICIPANTS OF OWN DEAL
-# ==========================================
 @router.get(
     "/deals/{deal_id}/participants",
     response_model=list[ParticipationResponse]
