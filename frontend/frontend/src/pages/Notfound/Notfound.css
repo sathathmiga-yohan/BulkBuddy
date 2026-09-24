@@ -1,0 +1,52 @@
+.not-found-page {
+  min-height: 75vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: #f8fafc;
+}
+
+.not-found-content {
+  max-width: 500px;
+  text-align: center;
+}
+
+.not-found-icon {
+  margin-bottom: 15px;
+  font-size: 4rem;
+}
+
+.not-found-content h1 {
+  margin: 0;
+  color: #2563eb;
+  font-size: 6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.not-found-content h2 {
+  margin: 15px 0 10px;
+  color: #111827;
+  font-size: 1.8rem;
+}
+
+.not-found-content p {
+  margin: 0 0 25px;
+  color: #6b7280;
+}
+
+.not-found-button {
+  display: inline-block;
+  padding: 11px 20px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.not-found-button:hover {
+  background: #1d4ed8;
+  color: #ffffff;
+}
