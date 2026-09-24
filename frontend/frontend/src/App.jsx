@@ -1,5 +1,6 @@
 import "./App.css";
 import Navbar from "./components/Navbar/Navbar";
+import Footer from "./components/Footer/Footer";
 
 function App() {
   return (
@@ -9,6 +10,7 @@ function App() {
         <h1>BulkBuddy</h1>
         <p>Buy Together. Save More.</p>
       </div>
+      <Footer />
     </div>
   );
 }
