@@ -12,30 +12,26 @@ from app.database import get_db
 from app.models.user import User, UserRole
 
 
-# ==========================================
 # PASSWORD HASHING
-# ==========================================
+
 password_hash = PasswordHash.recommended()
 
 
-# ==========================================
 # OAUTH2 / BEARER TOKEN
-# ==========================================
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/auth/login"
 )
 
 
-# ==========================================
 # HASH PASSWORD
-# ==========================================
+
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
-# ==========================================
 # VERIFY PASSWORD
-# ==========================================
+
 def verify_password(
     plain_password: str,
     hashed_password: str
@@ -46,9 +42,8 @@ def verify_password(
     )
 
 
-# ==========================================
 # CREATE ACCESS TOKEN
-# ==========================================
+
 def create_access_token(user_id: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
@@ -65,10 +60,8 @@ def create_access_token(user_id: int) -> str:
         algorithm=settings.JWT_ALGORITHM
     )
 
-
-# ==========================================
 # DECODE ACCESS TOKEN
-# ==========================================
+
 def decode_access_token(token: str) -> int:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -107,9 +100,8 @@ def decode_access_token(token: str) -> int:
         raise credentials_exception
 
 
-# ==========================================
 # GET CURRENT USER
-# ==========================================
+
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -142,9 +134,9 @@ def get_current_user(
     return user
 
 
-# ==========================================
+
 # CUSTOMER ACCESS
-# ==========================================
+
 def require_customer(
     current_user: User = Depends(get_current_user)
 ) -> User:
@@ -158,9 +150,7 @@ def require_customer(
     return current_user
 
 
-# ==========================================
 # SELLER ACCESS
-# ==========================================
 def require_seller(
     current_user: User = Depends(get_current_user)
 ) -> User:
@@ -173,10 +163,7 @@ def require_seller(
 
     return current_user
 
-
-# ==========================================
 # ADMIN ACCESS
-# ==========================================
 def require_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:
