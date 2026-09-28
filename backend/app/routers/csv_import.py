@@ -42,9 +42,9 @@ async def import_deals_csv(
     current_user: User = Depends(require_seller),
     db: Session = Depends(get_db),
 ):
-    # =========================
+  
     # CHECK FILE TYPE
-    # =========================
+  
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -57,9 +57,9 @@ async def import_deals_csv(
             detail="Only CSV files are allowed"
         )
 
-    # =========================
+
     # READ FILE
-    # =========================
+ 
     content = await file.read()
 
     if not content:
@@ -80,9 +80,9 @@ async def import_deals_csv(
         io.StringIO(text)
     )
 
-    # =========================
+
     # CHECK HEADERS
-    # =========================
+
     if reader.fieldnames is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -111,9 +111,9 @@ async def import_deals_csv(
 
     now = datetime.now(timezone.utc)
 
-    # =========================
+
     # VALIDATE EACH ROW
-    # =========================
+
     for row_number, row in enumerate(
         reader,
         start=2
@@ -157,9 +157,6 @@ async def import_deals_csv(
                 raise ValueError(
                     "Invalid price or quantity value"
                 )
-
-            # Example:
-            # 2026-09-24T20:00:00+05:30
             try:
                 deadline = datetime.fromisoformat(
                     row["deadline"].strip()
@@ -171,8 +168,6 @@ async def import_deals_csv(
                     "2026-09-24T20:00:00+05:30"
                 )
 
-            # If timezone is not provided,
-            # reject it to avoid ambiguity.
             if deadline.tzinfo is None:
                 raise ValueError(
                     "Deadline must include timezone"
@@ -230,18 +225,17 @@ async def import_deals_csv(
                 "error": str(error),
             })
 
-    # =========================
     # NO VALID DATA
-    # =========================
+
     if not new_deals and not errors:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CSV contains no data rows"
         )
 
-    # =========================
+  
     # VALIDATION ERRORS
-    # =========================
+
     # All-or-nothing import:
     # if one row is invalid, nothing is inserted.
     if errors:
@@ -253,9 +247,8 @@ async def import_deals_csv(
             }
         )
 
-    # =========================
     # SAVE ALL DEALS
-    # =========================
+  
     try:
         db.add_all(new_deals)
         db.commit()

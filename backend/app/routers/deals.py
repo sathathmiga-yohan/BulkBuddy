@@ -25,11 +25,9 @@ router = APIRouter(
     tags=["Deals"]
 )
 
-
-# ==========================================
 # GET ALL DEALS
 # PUBLIC MARKETPLACE
-# ==========================================
+
 @router.get(
     "",
     response_model=list[DealResponse]
@@ -53,10 +51,8 @@ def get_all_deals(
         for deal in deals
     ]
 
-
-# ==========================================
 # SELLER - GET MY DEALS
-# ==========================================
+
 @router.get(
     "/seller/my-deals",
     response_model=list[DealResponse]
@@ -82,11 +78,9 @@ def get_my_deals(
         for deal in deals
     ]
 
-
-# ==========================================
 # GET ONE DEAL
 # PUBLIC
-# ==========================================
+
 @router.get(
     "/{deal_id}",
     response_model=DealResponse
@@ -112,9 +106,9 @@ def get_deal(
     )
 
 
-# ==========================================
+
 # SELLER - CREATE DEAL
-# ==========================================
+
 @router.post(
     "",
     response_model=DealResponse,
@@ -156,10 +150,8 @@ def create_deal(
         new_deal
     )
 
-
-# ==========================================
 # SELLER - UPDATE OWN DEAL
-# ==========================================
+
 @router.patch(
     "/{deal_id}",
     response_model=DealResponse
@@ -202,9 +194,8 @@ def update_deal(
         exclude_unset=True
     )
 
-    # ======================================
     # FINAL VALUES AFTER UPDATE
-    # ======================================
+   
 
     final_normal_price = update_data.get(
         "normal_price",
@@ -231,9 +222,7 @@ def update_deal(
         deal.deadline
     )
 
-    # ======================================
     # VALIDATION
-    # ======================================
 
     # Group price must be cheaper
     if final_group_price >= final_normal_price:
@@ -262,9 +251,8 @@ def update_deal(
             detail="Deadline must be in the future"
         )
 
-    # ======================================
     # CURRENT PARTICIPANT CHECK
-    # ======================================
+
 
     current_participants = get_participant_count(
         db,
@@ -280,9 +268,9 @@ def update_deal(
             )
         )
 
-    # ======================================
+
     # SAVE UPDATE
-    # ======================================
+ 
 
     for field, value in update_data.items():
         setattr(

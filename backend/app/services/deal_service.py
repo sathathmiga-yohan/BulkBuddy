@@ -10,22 +10,17 @@ from app.models.participation import (
 )
 
 
-# =========================
 # CURRENT TIME
-# =========================
 def get_current_time() -> datetime:
     return datetime.now(timezone.utc)
 
 
-# =========================
+# 
 # NORMALIZE DATETIME
-# =========================
 def normalize_datetime(
     value: datetime
 ) -> datetime:
 
-    # MySQL may return DATETIME
-    # without timezone information.
     if value.tzinfo is None:
         return value.replace(
             tzinfo=timezone.utc
@@ -36,9 +31,7 @@ def normalize_datetime(
     )
 
 
-# =========================
 # DEADLINE CHECK
-# =========================
 def is_deadline_passed(
     deal: Deal
 ) -> bool:
@@ -50,9 +43,7 @@ def is_deadline_passed(
     return get_current_time() >= deadline
 
 
-# =========================
 # COUNT JOINED CUSTOMERS
-# =========================
 def get_participant_count(
     db: Session,
     deal_id: int
@@ -71,22 +62,16 @@ def get_participant_count(
     return count or 0
 
 
-# =========================
 # UPDATE DEAL STATUS
-# =========================
+
 def update_deal_status(
     db: Session,
     deal: Deal
 ) -> DealStatus:
 
-    # Inactive deal is not available
-    # for participation.
     if not deal.is_active:
         return deal.status
 
-    # Before deadline deal stays ACTIVE.
-    # Even if minimum target is reached,
-    # customers can still leave.
     if not is_deadline_passed(deal):
 
         if deal.status != DealStatus.ACTIVE:
@@ -113,10 +98,8 @@ def update_deal_status(
 
     return new_status
 
-
-# =========================
 # DEAL PROGRESS
-# =========================
+
 def get_deal_progress(
     db: Session,
     deal: Deal
@@ -171,9 +154,8 @@ def customer_has_joined(
     return participation is not None
 
 
-# =========================
 # BUILD DEAL RESPONSE
-# =========================
+
 def build_deal_response(
     db: Session,
     deal: Deal,

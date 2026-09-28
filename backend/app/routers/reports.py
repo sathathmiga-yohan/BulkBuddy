@@ -24,9 +24,9 @@ router = APIRouter(
 )
 
 
-# ==========================================
+
 # 1. DEAL OUTCOME REPORT
-# ==========================================
+
 @router.get("/deal-outcomes")
 def deal_outcome_report(
     current_user: User = Depends(require_seller),
@@ -73,9 +73,7 @@ def deal_outcome_report(
     }
 
 
-# ==========================================
 # 2. PARTICIPATION / CONVERSION REPORT
-# ==========================================
 @router.get("/participation")
 def participation_report(
     current_user: User = Depends(require_seller),
@@ -159,9 +157,8 @@ def participation_report(
     }
 
 
-# ==========================================
 # 3. SELLER SALES SUMMARY
-# ==========================================
+
 @router.get("/seller-sales")
 def seller_sales_summary(
     current_user: User = Depends(require_seller),
@@ -221,8 +218,6 @@ def seller_sales_summary(
         "successful_deals": successful_deals,
         "successful_participants": successful_participants,
 
-        # This project has no payment system,
-        # so this is deal value, not verified paid revenue.
         "committed_sales_value": total_sales_value,
 
         "deals": deal_summary,
