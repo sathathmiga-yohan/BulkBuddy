@@ -199,6 +199,12 @@
   text-decoration: underline;
 }
 
+.register-submit-button:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Mobile */
 
 @media (max-width: 480px) {

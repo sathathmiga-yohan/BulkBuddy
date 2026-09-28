@@ -1,102 +1,245 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+
+import {
+  getSellerDeals,
+  deleteDeal,
+} from "../../../services/dealservice";
+
 import "./SellerDeals.css";
 
 function SellerDeals() {
-  const deals = [
-    {
-      id: 1,
-      productName: "Smart Watch",
-      groupPrice: 6500,
-      buyers: 3,
-      minimumBuyers: 5,
-      status: "ACTIVE",
-    },
-    {
-      id: 2,
-      productName: "Wireless Headphones",
-      groupPrice: 9000,
-      buyers: 6,
-      minimumBuyers: 6,
-      status: "SUCCESSFUL",
-    },
-    {
-      id: 3,
-      productName: "Laptop Bag",
-      groupPrice: 4000,
-      buyers: 2,
-      minimumBuyers: 4,
-      status: "ACTIVE",
-    },
-  ];
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // ==========================================
+  // LOAD SELLER DEALS
+  // ==========================================
+  useEffect(() => {
+    const loadSellerDeals = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const data = await getSellerDeals();
+
+        setDeals(
+          Array.isArray(data) ? data : []
+        );
+      } catch (error) {
+        console.error(
+          "Seller deals error:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            "Failed to load seller deals."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSellerDeals();
+  }, []);
+
+  // ==========================================
+  // DELETE DEAL
+  // ==========================================
+  const handleDelete = async (dealId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this deal?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteDeal(dealId);
+
+      // Remove deleted deal from the page
+      setDeals((currentDeals) =>
+        currentDeals.filter(
+          (deal) => deal.id !== dealId
+        )
+      );
+
+      alert("Deal deleted successfully");
+    } catch (error) {
+      console.error(
+        "Delete deal error:",
+        error
+      );
+
+      alert(
+        error.response?.data?.detail ||
+          "Failed to delete deal."
+      );
+    }
+  };
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+  if (loading) {
+    return (
+      <main className="seller-deals-page">
+        <div className="container">
+          <p>Loading deals...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="seller-deals-page">
       <div className="container">
+
+        {/* HEADER */}
         <div className="seller-deals-header">
           <div>
             <span>Seller Center</span>
+
             <h1>My Deals</h1>
-            <p>View and manage your group-buying deals.</p>
+
+            <p>
+              View and manage your
+              group-buying deals.
+            </p>
           </div>
 
-          <Link to="/seller/create-deal" className="seller-new-deal">
+          <Link
+            to="/seller/create-deal"
+            className="seller-new-deal"
+          >
             + Create Deal
           </Link>
         </div>
 
-        <div className="seller-deals-table-wrapper">
-          <table className="seller-deals-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Group Price</th>
-                <th>Participants</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+        {/* ERROR */}
+        {error && (
+          <div className="seller-deals-error">
+            {error}
+          </div>
+        )}
 
-            <tbody>
-              {deals.map((deal) => (
-                <tr key={deal.id}>
-                  <td className="seller-product-name">
-                    {deal.productName}
-                  </td>
+        {/* NO DEALS */}
+        {!error && deals.length === 0 ? (
+          <div className="seller-empty-deals">
 
-                  <td>
-                    Rs. {deal.groupPrice.toLocaleString()}
-                  </td>
+            <p>
+              You have not created any deals yet.
+            </p>
 
-                  <td>
-                    {deal.buyers} / {deal.minimumBuyers}
-                  </td>
+            <Link to="/seller/create-deal">
+              Create your first deal
+            </Link>
 
-                  <td>
-                    <span
-                      className={`seller-deal-status ${deal.status.toLowerCase()}`}
-                    >
-                      {deal.status}
-                    </span>
-                  </td>
+          </div>
+        ) : !error ? (
 
-                  <td>
-                    <div className="seller-deal-actions">
-                      <Link
-                        to={`/seller/deals/${deal.id}/participants`}
-                      >
-                        Participants
-                      </Link>
+          /* DEAL TABLE */
+          <div className="seller-deals-table-wrapper">
 
-                      <button type="button">
-                        Edit
-                      </button>
-                    </div>
-                  </td>
+            <table className="seller-deals-table">
+
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Group Price</th>
+                  <th>Participants</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+
+                {deals.map((deal) => {
+
+                  const groupPrice = Number(
+                    deal.group_price ?? 0
+                  );
+
+                  const minimumBuyers = Number(
+                    deal.minimum_buyers ?? 0
+                  );
+
+                  const participantCount = Number(
+                    deal.current_participants ?? 0
+                  );
+
+                  const status =
+                    deal.status || "ACTIVE";
+
+                  return (
+                    <tr key={deal.id}>
+
+                      {/* PRODUCT */}
+                      <td className="seller-product-name">
+                        {deal.product_name}
+                      </td>
+
+                      {/* GROUP PRICE */}
+                      <td>
+                        Rs.{" "}
+                        {groupPrice.toLocaleString()}
+                      </td>
+
+                      {/* PARTICIPANTS */}
+                      <td>
+                        {participantCount} /{" "}
+                        {minimumBuyers}
+                      </td>
+
+                      {/* STATUS */}
+                      <td>
+                        <span
+                          className={`seller-deal-status ${status.toLowerCase()}`}
+                        >
+                          {status}
+                        </span>
+                      </td>
+
+                      {/* ACTIONS */}
+                      <td>
+                        <div className="seller-deal-actions">
+
+                          {/* VIEW PARTICIPANTS */}
+                          <Link
+                            to={`/seller/deals/${deal.id}/participants`}
+                          >
+                            Participants
+                          </Link>
+
+                          {/* DELETE DEAL */}
+                          <button
+                            type="button"
+                            className="seller-delete-deal"
+                            onClick={() =>
+                              handleDelete(deal.id)
+                            }
+                          >
+                            Delete
+                          </button>
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })}
+
+              </tbody>
+
+            </table>
+
+          </div>
+        ) : null}
+
       </div>
     </main>
   );

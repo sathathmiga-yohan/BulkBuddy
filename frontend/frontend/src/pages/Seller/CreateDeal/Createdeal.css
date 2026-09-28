@@ -1,0 +1,129 @@
+.create-deal-page {
+  min-height: 100vh;
+  padding: 60px 20px 90px;
+  background: #f8fafc;
+}
+
+.create-deal-container {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+}
+
+.create-back-link {
+  display: inline-block;
+  margin-bottom: 25px;
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.create-deal-card {
+  padding: 40px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+}
+
+.create-deal-heading {
+  margin-bottom: 30px;
+}
+
+.create-deal-heading span {
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.create-deal-heading h1 {
+  margin: 7px 0;
+  color: #111827;
+  font-size: 2rem;
+}
+
+.create-deal-heading p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.create-deal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.create-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.create-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.create-form-group label {
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.create-form-group input,
+.create-form-group textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+}
+
+.create-form-group input:focus,
+.create-form-group textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.create-form-group textarea {
+  resize: vertical;
+}
+
+.create-deal-error {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+}
+
+.create-submit-button {
+  padding: 13px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.create-submit-button:hover {
+  background: #1d4ed8;
+}
+
+.create-submit-button:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .create-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .create-deal-card {
+    padding: 25px 20px;
+  }
+}

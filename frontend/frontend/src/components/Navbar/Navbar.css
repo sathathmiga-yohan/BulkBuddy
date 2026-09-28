@@ -12,17 +12,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 30px;
+  gap: 24px;
 }
 
 /* =========================
-   Logo
+   LOGO
 ========================= */
 
 .navbar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
   font-size: 1.7rem;
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -48,20 +49,23 @@
 }
 
 /* =========================
-   Navigation Links
+   NAVIGATION
 ========================= */
 
 .navbar-links {
   display: flex;
   align-items: center;
-  gap: 32px;
+  justify-content: center;
+  gap: 24px;
+  flex: 1;
 }
 
 .nav-link {
   color: #4b5563;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   font-weight: 500;
   text-decoration: none;
+  white-space: nowrap;
   transition: color 0.2s ease;
 }
 
@@ -75,14 +79,17 @@
 }
 
 /* =========================
-   Login / Register
+   RIGHT SIDE
 ========================= */
 
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
+  flex-shrink: 0;
 }
+
+/* LOGIN */
 
 .login-link {
   color: #374151;
@@ -95,15 +102,17 @@
   color: #2563eb;
 }
 
+/* REGISTER */
+
 .register-button {
-  background-color: #2563eb;
-  color: #ffffff;
   padding: 10px 20px;
   border-radius: 8px;
+  background-color: #2563eb;
+  color: #ffffff;
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
-
+  white-space: nowrap;
   transition:
     background-color 0.2s ease,
     transform 0.2s ease;
@@ -116,10 +125,50 @@
 }
 
 /* =========================
-   Tablet
+   LOGGED-IN USER
 ========================= */
 
-@media (max-width: 768px) {
+.navbar-user {
+  max-width: 140px;
+  overflow: hidden;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================
+   LOGOUT
+========================= */
+
+.logout-button {
+  padding: 9px 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.logout-button:hover {
+  border-color: #2563eb;
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+/* =========================
+   TABLET
+========================= */
+
+@media (max-width: 900px) {
   .navbar-container {
     min-height: auto;
     padding-top: 14px;
@@ -138,13 +187,15 @@
   .navbar-links {
     order: 3;
     width: 100%;
+    flex: auto;
     justify-content: center;
-    gap: 30px;
-    padding-top: 10px;
+    gap: 24px;
+    padding-top: 8px;
+    overflow-x: auto;
   }
 
   .navbar-actions {
-    gap: 12px;
+    gap: 10px;
   }
 
   .register-button {
@@ -153,23 +204,39 @@
 }
 
 /* =========================
-   Mobile
+   MOBILE
 ========================= */
 
 @media (max-width: 480px) {
+  .navbar-brand {
+    font-size: 1.3rem;
+  }
+
+  .brand-icon {
+    font-size: 1.4rem;
+  }
+
+  .navbar-links {
+    justify-content: flex-start;
+    gap: 20px;
+    padding-bottom: 4px;
+  }
+
   .login-link {
     display: none;
   }
 
-  .navbar-links {
-    gap: 22px;
+  .navbar-user {
+    display: none;
   }
 
-  .navbar-brand {
-    font-size: 1.35rem;
+  .register-button {
+    padding: 8px 12px;
+    font-size: 0.85rem;
   }
 
-  .brand-icon {
-    font-size: 1.5rem;
+  .logout-button {
+    padding: 8px 12px;
+    font-size: 0.85rem;
   }
 }

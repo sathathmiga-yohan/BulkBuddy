@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../../services/api";
+import {
+  loginUser,
+  getCurrentUser,
+} from "../../services/authservice";
 import "./Login.css";
 
 function Login() {
@@ -12,6 +15,8 @@ function Login() {
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -20,52 +25,50 @@ function Login() {
       ...previousData,
       [name]: value,
     }));
+
+    setError("");
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
-      const loginData = new URLSearchParams();
+      setLoading(true);
+      setError("");
 
-      loginData.append("username", formData.email);
-      loginData.append("password", formData.password);
-
-      const response = await api.post(
-        "/auth/login",
-        loginData,
-        {
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        }
+      const loginResponse = await loginUser(
+        formData.email,
+        formData.password
       );
 
       localStorage.setItem(
         "token",
-        response.data.access_token
+        loginResponse.access_token
       );
 
-      const userResponse = await api.get("/auth/me");
+      const user = await getCurrentUser();
 
       localStorage.setItem(
         "user",
-        JSON.stringify(userResponse.data)
+        JSON.stringify(user)
       );
 
       alert("Login successful");
 
-      if (userResponse.data.role === "SELLER") {
+      if (user.role === "SELLER") {
         navigate("/seller");
       } else {
         navigate("/deals");
       }
     } catch (error) {
-      const message =
-        error.response?.data?.detail ||
-        "Login failed";
+      console.error("Login error:", error);
 
-      alert(message);
+      setError(
+        error.response?.data?.detail ||
+          "Invalid email or password."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,13 +82,19 @@ function Login() {
             <h1>Welcome Back</h1>
 
             <p>
-              Sign in to your BulkBuddy account and continue saving together.
+              Sign in to your BulkBuddy account and continue
+              saving together.
             </p>
           </div>
 
-          <form className="login-form" onSubmit={handleSubmit}>
+          <form
+            className="login-form"
+            onSubmit={handleSubmit}
+          >
             <div className="form-group">
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="email">
+                Email Address
+              </label>
 
               <input
                 type="email"
@@ -99,11 +108,15 @@ function Login() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">
+                Password
+              </label>
 
               <div className="password-input-wrapper">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={
+                    showPassword ? "text" : "password"
+                  }
                   id="password"
                   name="password"
                   placeholder="Enter your password"
@@ -115,9 +128,13 @@ function Login() {
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
                   aria-label={
-                    showPassword ? "Hide password" : "Show password"
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
                   }
                 >
                   {showPassword ? "🙈" : "👁️"}
@@ -125,15 +142,27 @@ function Login() {
               </div>
             </div>
 
-            <button type="submit" className="login-button">
-              Sign In
+            {error && (
+              <div className="login-error">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="login-button"
+              disabled={loading}
+            >
+              {loading ? "Signing In..." : "Sign In"}
             </button>
           </form>
 
           <div className="login-footer">
             <p>
               Don't have an account?{" "}
-              <Link to="/register">Create Account</Link>
+              <Link to="/register">
+                Create Account
+              </Link>
             </p>
           </div>
         </div>
