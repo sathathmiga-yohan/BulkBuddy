@@ -39,7 +39,9 @@ def get_all_deals(
 ):
     deals = db.scalars(
         select(Deal)
-        .where(Deal.is_active == True)
+        .where(
+            Deal.is_active == True
+        )
         .order_by(Deal.created_at.desc())
     ).all()
 
@@ -54,7 +56,6 @@ def get_all_deals(
 
 # ==========================================
 # SELLER - GET MY DEALS
-# Keep this before /{deal_id}
 # ==========================================
 @router.get(
     "/seller/my-deals",
@@ -67,7 +68,8 @@ def get_my_deals(
     deals = db.scalars(
         select(Deal)
         .where(
-            Deal.seller_id == current_user.id
+            Deal.seller_id == current_user.id,
+            Deal.is_active == True
         )
         .order_by(Deal.created_at.desc())
     ).all()
@@ -191,10 +193,10 @@ def update_deal(
 
     # Cannot edit after deadline
     if now >= normalize_datetime(deal.deadline):
-       raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Expired deal cannot be updated"
-    )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Expired deal cannot be updated"
+        )
 
     update_data = deal_data.model_dump(
         exclude_unset=True
@@ -237,7 +239,10 @@ def update_deal(
     if final_group_price >= final_normal_price:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group price must be less than normal price"
+            detail=(
+                "Group price must be less than "
+                "normal price"
+            )
         )
 
     # Maximum cannot be below minimum
@@ -252,10 +257,10 @@ def update_deal(
 
     # Deadline must stay in future
     if normalize_datetime(final_deadline) <= now:
-      raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Deadline must be in the future"
-    )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deadline must be in the future"
+        )
 
     # ======================================
     # CURRENT PARTICIPANT CHECK
@@ -266,9 +271,6 @@ def update_deal(
         deal.id
     )
 
-    # Example:
-    # 18 customers already joined
-    # Seller cannot change maximum quantity to 10
     if final_maximum_quantity < current_participants:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -296,3 +298,45 @@ def update_deal(
         db,
         deal
     )
+
+
+# ==========================================
+# SELLER - DELETE OWN DEAL
+# ==========================================
+# ==========================================
+# SELLER - DELETE OWN DEAL
+# ==========================================
+@router.delete(
+    "/{deal_id}"
+)
+def delete_deal(
+    deal_id: int,
+    current_user: User = Depends(require_seller),
+    db: Session = Depends(get_db)
+):
+    deal = db.get(
+        Deal,
+        deal_id
+    )
+
+    # Deal must exist
+    if deal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found"
+        )
+
+    # Seller can delete only own deal
+    if deal.seller_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own deals"
+        )
+
+    # Permanently delete from database
+    db.delete(deal)
+    db.commit()
+
+    return {
+        "message": "Deal deleted successfully"
+    }

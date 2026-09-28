@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { registerUser } from "../../services/authservice";
 import "./Register.css";
 
 function Register() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -12,9 +15,11 @@ function Register() {
   });
 
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -27,7 +32,7 @@ function Register() {
     setError("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
@@ -42,10 +47,25 @@ function Register() {
       role: formData.role,
     };
 
-    // Backend connection will be added later.
-    console.log("Register data:", registerData);
+    try {
+      setLoading(true);
+      setError("");
 
-    setError("");
+      await registerUser(registerData);
+
+      alert("Account created successfully!");
+
+      navigate("/login");
+    } catch (error) {
+      console.error("Register error:", error);
+
+      setError(
+        error.response?.data?.detail ||
+          "Failed to create account."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,14 +79,19 @@ function Register() {
             <h1>Create Your Account</h1>
 
             <p>
-              Join BulkBuddy and start saving together with group deals.
+              Join BulkBuddy and start saving together with
+              group deals.
             </p>
           </div>
 
-          <form className="register-form" onSubmit={handleSubmit}>
-
+          <form
+            className="register-form"
+            onSubmit={handleSubmit}
+          >
             <div className="register-form-group">
-              <label htmlFor="name">Full Name</label>
+              <label htmlFor="name">
+                Full Name
+              </label>
 
               <input
                 type="text"
@@ -80,7 +105,9 @@ function Register() {
             </div>
 
             <div className="register-form-group">
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="email">
+                Email Address
+              </label>
 
               <input
                 type="email"
@@ -94,7 +121,9 @@ function Register() {
             </div>
 
             <div className="register-form-group">
-              <label htmlFor="role">Account Type</label>
+              <label htmlFor="role">
+                Account Type
+              </label>
 
               <select
                 id="role"
@@ -102,18 +131,26 @@ function Register() {
                 value={formData.role}
                 onChange={handleChange}
               >
-                <option value="CUSTOMER">Customer</option>
-                <option value="SELLER">Seller</option>
+                <option value="CUSTOMER">
+                  Customer
+                </option>
+
+                <option value="SELLER">
+                  Seller
+                </option>
               </select>
             </div>
 
-            {/* Password */}
             <div className="register-form-group">
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">
+                Password
+              </label>
 
               <div className="register-password-wrapper">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={
+                    showPassword ? "text" : "password"
+                  }
                   id="password"
                   name="password"
                   placeholder="Create a password"
@@ -125,9 +162,13 @@ function Register() {
                 <button
                   type="button"
                   className="register-password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() =>
+                    setShowPassword(!showPassword)
+                  }
                   aria-label={
-                    showPassword ? "Hide password" : "Show password"
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
                   }
                 >
                   {showPassword ? "🙈" : "👁️"}
@@ -135,7 +176,6 @@ function Register() {
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div className="register-form-group">
               <label htmlFor="confirmPassword">
                 Confirm Password
@@ -143,7 +183,11 @@ function Register() {
 
               <div className="register-password-wrapper">
                 <input
-                  type={showConfirmPassword ? "text" : "password"}
+                  type={
+                    showConfirmPassword
+                      ? "text"
+                      : "password"
+                  }
                   id="confirmPassword"
                   name="confirmPassword"
                   placeholder="Enter password again"
@@ -156,7 +200,9 @@ function Register() {
                   type="button"
                   className="register-password-toggle"
                   onClick={() =>
-                    setShowConfirmPassword(!showConfirmPassword)
+                    setShowConfirmPassword(
+                      !showConfirmPassword
+                    )
                   }
                   aria-label={
                     showConfirmPassword
@@ -164,7 +210,9 @@ function Register() {
                       : "Show confirm password"
                   }
                 >
-                  {showConfirmPassword ? "🙈" : "👁️"}
+                  {showConfirmPassword
+                    ? "🙈"
+                    : "👁️"}
                 </button>
               </div>
             </div>
@@ -178,16 +226,20 @@ function Register() {
             <button
               type="submit"
               className="register-submit-button"
+              disabled={loading}
             >
-              Create Account
+              {loading
+                ? "Creating Account..."
+                : "Create Account"}
             </button>
-
           </form>
 
           <div className="register-footer">
             <p>
               Already have an account?{" "}
-              <Link to="/login">Sign In</Link>
+              <Link to="/login">
+                Sign In
+              </Link>
             </p>
           </div>
 

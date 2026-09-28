@@ -1,0 +1,107 @@
+.participants-page {
+  min-height: 100vh;
+  padding: 60px 0 90px;
+  background: #f8fafc;
+}
+
+.participants-back {
+  display: inline-block;
+  margin-bottom: 25px;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.participants-header {
+  margin-bottom: 30px;
+}
+
+.participants-header span {
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.participants-header h1 {
+  margin: 7px 0;
+  color: #111827;
+  font-size: 2.2rem;
+}
+
+.participants-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.participants-table-wrapper {
+  overflow-x: auto;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+}
+
+.participants-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.participants-table th,
+.participants-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.participants-table th {
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.participant-status {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.participant-status.joined {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.participant-status.cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.participants-message {
+  padding: 40px;
+  background: white;
+  border-radius: 14px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.participants-error {
+  padding: 15px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 9px;
+}
+
+@media (max-width: 600px) {
+  .participants-page {
+    padding: 40px 15px 70px;
+  }
+
+  .participants-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .participants-table th,
+  .participants-table td {
+    padding: 13px 15px;
+    white-space: nowrap;
+  }
+}

@@ -159,6 +159,21 @@
 }
 
 /* =========================
+   Error
+========================= */
+
+.deals-error {
+  margin-bottom: 30px;
+  padding: 14px 18px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* =========================
    Responsive
 ========================= */
 
