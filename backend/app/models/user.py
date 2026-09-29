@@ -1,7 +1,13 @@
 from datetime import datetime, timezone
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum as SQLEnum,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -14,10 +20,12 @@ class UserRole(str, Enum):
 
 
 class User(Base):
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(
-        primary_key=True, 
+        Integer,
+        primary_key=True,
         index=True
     )
 
@@ -40,8 +48,8 @@ class User(Base):
 
     role: Mapped[UserRole] = mapped_column(
         SQLEnum(UserRole),
-        nullable=False,
-        default=UserRole.CUSTOMER
+        default=UserRole.CUSTOMER,
+        nullable=False
     )
 
     is_active: Mapped[bool] = mapped_column(
@@ -56,14 +64,31 @@ class User(Base):
         nullable=False
     )
 
-    # Seller -> Deals
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    # Relationships
+
     deals = relationship(
         "Deal",
         back_populates="seller"
     )
 
-    # Customer -> Participations
     participations = relationship(
         "Participation",
         back_populates="customer"
+    )
+
+    orders = relationship(
+        "Order",
+        back_populates="customer"
+    )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user"
     )
