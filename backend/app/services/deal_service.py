@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from decimal import Decimal
 
@@ -8,17 +7,23 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.deal import Deal, DealStatus
+
 from app.models.participation import (
     Participation,
     ParticipationStatus,
 )
+
 from app.schemas.deal import DealUpdate
+
 from app.utils.datetime_utils import (
     is_deadline_passed,
     normalize_datetime,
 )
 
+
+# ==========================================
 # GET JOINED PARTICIPANT COUNT
+# ==========================================
 
 def get_participant_count(
     db: Session,
@@ -34,7 +39,10 @@ def get_participant_count(
 
     return count or 0
 
+
+# ==========================================
 # GET WAITING CUSTOMER COUNT
+# ==========================================
 
 def get_waiting_count(
     db: Session,
@@ -50,7 +58,10 @@ def get_waiting_count(
 
     return count or 0
 
+
+# ==========================================
 # GET DEAL BY ID
+# ==========================================
 
 def get_deal_or_404(
     db: Session,
@@ -67,7 +78,10 @@ def get_deal_or_404(
 
     return deal
 
+
+# ==========================================
 # CHECK SELLER OWNERSHIP
+# ==========================================
 
 def validate_seller_ownership(
     deal: Deal,
@@ -80,7 +94,10 @@ def validate_seller_ownership(
             detail="You can only manage your own deals"
         )
 
+
+# ==========================================
 # CHECK DEAL IS ACTIVE AND OPEN
+# ==========================================
 
 def validate_deal_is_open(
     deal: Deal
@@ -98,7 +115,10 @@ def validate_deal_is_open(
             detail="Deal deadline has passed"
         )
 
+
+# ==========================================
 # VALIDATE DEAL PRICE AND CAPACITY
+# ==========================================
 
 def validate_deal_values(
     normal_price: Decimal,
@@ -129,7 +149,10 @@ def validate_deal_values(
     if maximum_quantity < minimum_buyers:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Maximum quantity must be greater than or equal to minimum buyers"
+            detail=(
+                "Maximum quantity must be greater than "
+                "or equal to minimum buyers"
+            )
         )
 
     if is_deadline_passed(deadline):
@@ -138,7 +161,10 @@ def validate_deal_values(
             detail="Deadline must be in the future"
         )
 
+
+# ==========================================
 # VALIDATE DEAL UPDATE
+# ==========================================
 
 def validate_deal_update(
     db: Session,
@@ -155,7 +181,8 @@ def validate_deal_update(
     if not changes:
         return {}
 
-    # These fields cannot be explicitly set to null.
+    # Required fields cannot be explicitly set to null.
+
     required_fields = {
         "product_name",
         "normal_price",
@@ -166,14 +193,16 @@ def validate_deal_update(
     }
 
     for field in required_fields:
+
         if field in changes and changes[field] is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"{field} cannot be null"
             )
 
-    # Once participation history exists, preserve
-    # the deal's important terms.
+    # Important deal terms cannot be changed
+    # once participation history exists.
+
     restricted_fields = {
         "normal_price",
         "group_price",
@@ -190,29 +219,32 @@ def validate_deal_update(
 
     if participation_exists is not None:
 
-    for field in restricted_fields:
+        for field in restricted_fields:
 
-        if field not in changes:
-            continue
+            if field not in changes:
+                continue
 
-        old_value = getattr(deal, field)
-        new_value = changes[field]
+            old_value = getattr(deal, field)
+            new_value = changes[field]
 
-        if field == "deadline":
-            old_value = normalize_datetime(old_value)
-            new_value = normalize_datetime(new_value)
+            # Compare deadlines using normalized UTC values.
 
-        if new_value != old_value:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Price, capacity and deadline cannot "
-                    "be changed after participation exists"
+            if field == "deadline":
+                old_value = normalize_datetime(old_value)
+                new_value = normalize_datetime(new_value)
+
+            if new_value != old_value:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "Price, capacity and deadline cannot "
+                        "be changed after participation exists"
+                    )
                 )
-            )
 
-    # Validate the final combined values, not just
-    # individual fields in a partial PATCH request.
+    # Validate final combined values,
+    # not only the submitted PATCH fields.
+
     normal_price = changes.get(
         "normal_price",
         deal.normal_price
@@ -248,7 +280,10 @@ def validate_deal_update(
 
     return changes
 
+
+# ==========================================
 # VALIDATE DEAL DELETION
+# ==========================================
 
 def validate_deal_deletion(
     db: Session,
@@ -269,7 +304,10 @@ def validate_deal_deletion(
             detail="Cannot delete a deal with participation history"
         )
 
+
+# ==========================================
 # BUILD DEAL RESPONSE
+# ==========================================
 
 def build_deal_response(
     db: Session,

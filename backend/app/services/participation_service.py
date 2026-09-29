@@ -1,4 +1,3 @@
-
 from fastapi import HTTPException, status
 
 from sqlalchemy import func, or_, and_, select
@@ -30,7 +29,10 @@ from app.utils.datetime_utils import (
     utc_now,
 )
 
+
+# ==========================================
 # GET CUSTOMER PARTICIPATION
+# ==========================================
 
 def get_customer_participation(
     db: Session,
@@ -45,7 +47,10 @@ def get_customer_participation(
         )
     )
 
+
+# ==========================================
 # GET WAITING POSITION
+# ==========================================
 
 def get_waiting_position(
     db: Session,
@@ -57,6 +62,7 @@ def get_waiting_position(
 
     # MySQL stores our UTC DATETIME values without
     # timezone information.
+
     joined_at = normalize_datetime(
         participation.joined_at
     ).replace(tzinfo=None)
@@ -77,13 +83,15 @@ def get_waiting_position(
 
     return (earlier_count or 0) + 1
 
+
+# ==========================================
 # BUILD PARTICIPATION RESPONSE
+# ==========================================
 
 def build_participation_response(
     db: Session,
     participation: Participation
 ) -> dict:
-
 
     return {
         "id": participation.id,
@@ -100,6 +108,7 @@ def build_participation_response(
         "joined_at": normalize_datetime(
             participation.joined_at
         ),
+
         "updated_at": normalize_datetime(
             participation.updated_at
         ),
@@ -109,11 +118,11 @@ def build_participation_response(
             participation
         ),
     }
-  
-    }
 
+
+# ==========================================
 # CLEAR DELIVERY DETAILS
-
+# ==========================================
 
 def clear_delivery_details(
     participation: Participation
@@ -124,9 +133,11 @@ def clear_delivery_details(
     participation.delivery_address = None
     participation.delivery_city = None
     participation.delivery_postal_code = None
-  
 
+
+# ==========================================
 # GET FIRST WAITING CUSTOMER - FIFO
+# ==========================================
 
 def get_first_waiting_customer(
     db: Session,
@@ -143,7 +154,10 @@ def get_first_waiting_customer(
         ).limit(1)
     )
 
+
+# ==========================================
 # JOIN / REJOIN DEAL
+# ==========================================
 
 def join_deal(
     db: Session,
@@ -153,6 +167,9 @@ def join_deal(
 ) -> Participation:
 
     try:
+
+        # Lock the deal to prevent concurrent
+        # joins from exceeding maximum capacity.
 
         deal = db.scalar(
             select(Deal).where(
@@ -169,6 +186,7 @@ def join_deal(
         validate_deal_is_open(deal)
 
         # A seller cannot join their own deal.
+
         if deal.seller_id == customer.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -198,7 +216,9 @@ def join_deal(
                     detail="Expired participation cannot be rejoined"
                 )
 
+        # ======================================
         # CHECK CAPACITY AND WAITING QUEUE
+        # ======================================
 
         joined_count = get_participant_count(
             db,
@@ -212,6 +232,7 @@ def join_deal(
 
         # A new customer must not bypass customers
         # who are already waiting.
+
         if (
             joined_count < deal.maximum_quantity
             and first_waiting is None
@@ -223,7 +244,9 @@ def join_deal(
 
         now = utc_now()
 
+        # ======================================
         # CREATE OR REUSE PARTICIPATION
+        # ======================================
 
         if existing is None:
 
@@ -241,14 +264,17 @@ def join_deal(
 
             # Rejoin updates the existing row.
             # The customer receives a fresh queue time.
+
             participation = existing
             participation.status = new_status
             participation.joined_at = now
             participation.updated_at = now
 
+        # ======================================
         # SAVE FRESH DELIVERY DETAILS
+        # ======================================
 
-                participation.delivery_name = (
+        participation.delivery_name = (
             join_data.delivery_name
         )
 
@@ -270,7 +296,9 @@ def join_deal(
 
         db.flush()
 
+        # ======================================
         # WAITING NOTIFICATION
+        # ======================================
 
         if new_status == ParticipationStatus.WAITING:
 
@@ -282,6 +310,7 @@ def join_deal(
 
         # Participation and notification are
         # committed together.
+
         db.commit()
         db.refresh(participation)
 
@@ -291,7 +320,10 @@ def join_deal(
         db.rollback()
         raise
 
+
+# ==========================================
 # LEAVE DEAL + FIFO PROMOTION
+# ==========================================
 
 def leave_deal(
     db: Session,
@@ -302,6 +334,7 @@ def leave_deal(
     try:
 
         # Use the same Deal lock as JOIN.
+
         deal = db.scalar(
             select(Deal).where(
                 Deal.id == deal_id
@@ -341,7 +374,9 @@ def leave_deal(
             participation.status == ParticipationStatus.JOINED
         )
 
+        # ======================================
         # CANCEL CURRENT PARTICIPATION
+        # ======================================
 
         participation.status = ParticipationStatus.CANCELLED
         participation.updated_at = utc_now()
@@ -350,7 +385,9 @@ def leave_deal(
 
         db.flush()
 
+        # ======================================
         # PROMOTE FIRST WAITING CUSTOMER
+        # ======================================
 
         if was_joined:
 
@@ -366,7 +403,7 @@ def leave_deal(
 
                 db.flush()
 
-                # PROMOTION NOTIFICATIOn
+                # Promotion notification
 
                 notify_promoted_customer(
                     db=db,
