@@ -1,327 +1,363 @@
-import { useEffect, useState } from "react";
+
 import { Link } from "react-router-dom";
 
-import DealCard from "../../components/DealCard/DealCard";
-import { getDeals } from "../../services/dealservice";
-import homeHero from "../../assets/images/1.png";
+import {
+  ArrowRight,
+  Users,
+  ShieldCheck,
+  Truck,
+  BadgePercent,
+  Clock3,
+  ShoppingBag,
+  Star
+} from "lucide-react";
 
 import "./Home.css";
 
-function Home() {
-  const [featuredDeals, setFeaturedDeals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+const benefits = [
+  {
+    icon: Users,
+    title: "Group Buying",
+    description:
+      "Join other shoppers and unlock better prices together."
+  },
+  {
+    icon: BadgePercent,
+    title: "Big Savings",
+    description:
+      "Enjoy exclusive discounts on your favourite products."
+  },
+  {
+    icon: ShieldCheck,
+    title: "Trusted Sellers",
+    description:
+      "Shop confidently with our trusted marketplace sellers."
+  },
+  {
+    icon: Truck,
+    title: "Easy Delivery",
+    description:
+      "Get your group purchases delivered to your doorstep."
+  }
+];
 
-  // ==========================================
-  // LOAD ACTIVE DEALS
-  // ==========================================
-  useEffect(() => {
-    const loadDeals = async () => {
-      try {
-        setLoading(true);
-        setError("");
+const trendingDeals = [
+  {
+    id: 1,
+    name: "Premium Wireless Headphones",
+    category: "Electronics",
+    image:
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700&q=85",
+    originalPrice: 18000,
+    groupPrice: 12999,
+    joined: 16,
+    required: 20,
+    daysLeft: 3,
+    rating: 4.8,
+    discount: 28
+  },
+  {
+    id: 2,
+    name: "Smart Watch Series Pro",
+    category: "Accessories",
+    image:
+      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=700&q=85",
+    originalPrice: 25000,
+    groupPrice: 18999,
+    joined: 12,
+    required: 15,
+    daysLeft: 5,
+    rating: 4.9,
+    discount: 24
+  },
+  {
+    id: 3,
+    name: "Professional DSLR Camera",
+    category: "Electronics",
+    image:
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=700&q=85",
+    originalPrice: 150000,
+    groupPrice: 119999,
+    joined: 7,
+    required: 10,
+    daysLeft: 2,
+    rating: 4.7,
+    discount: 20
+  },
+  {
+    id: 4,
+    name: "Modern Running Sneakers",
+    category: "Fashion",
+    image:
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700&q=85",
+    originalPrice: 16000,
+    groupPrice: 10999,
+    joined: 18,
+    required: 25,
+    daysLeft: 4,
+    rating: 4.8,
+    discount: 31
+  }
+];
 
-        const data = await getDeals();
+const formatPrice = (amount) =>
+  new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    maximumFractionDigits: 0
+  }).format(amount);
 
-        const deals = Array.isArray(data) ? data : [];
-
-        // Show only first 3 deals on Home page
-        const featured = deals
-          .slice(0, 3)
-          .map((deal) => ({
-            id: deal.id,
-
-            productName: deal.product_name,
-
-            description: deal.description,
-
-            normalPrice: Number(
-              deal.normal_price ?? 0
-            ),
-
-            groupPrice: Number(
-              deal.group_price ?? 0
-            ),
-
-            minimumBuyers: Number(
-              deal.minimum_buyers ?? 0
-            ),
-
-            currentBuyers: Number(
-              deal.current_participants ?? 0
-            ),
-
-            deadline: deal.deadline,
-
-            status: deal.status,
-
-            icon: "🛍️",
-          }));
-
-        setFeaturedDeals(featured);
-      } catch (error) {
-        console.error(
-          "Home deals error:",
-          error
-        );
-
-        setError(
-          error.response?.data?.detail ||
-            "Failed to load deals."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDeals();
-  }, []);
+function DealCard({ deal }) {
+  const progress = Math.min(
+    (deal.joined / deal.required) * 100,
+    100
+  );
 
   return (
-    <main className="home-page">
+    <article className="home-deal-card">
+      <div className="home-deal-image-wrap">
+        <img src={deal.image} alt={deal.name} />
 
-      {/* HERO */}
+        <span className="home-discount">
+          -{deal.discount}%
+        </span>
+
+        <span className="home-days-left">
+          <Clock3 size={13} />
+          {deal.daysLeft} days left
+        </span>
+      </div>
+
+      <div className="home-deal-content">
+        <div className="home-deal-topline">
+          <span>{deal.category}</span>
+
+          <span className="home-rating">
+            <Star size={13} fill="currentColor" />
+            {deal.rating}
+          </span>
+        </div>
+
+        <h3>{deal.name}</h3>
+
+        <div className="home-deal-prices">
+          <strong>{formatPrice(deal.groupPrice)}</strong>
+          <del>{formatPrice(deal.originalPrice)}</del>
+        </div>
+
+        <div className="home-progress-label">
+          <span>
+            <Users size={14} />
+            {deal.joined} / {deal.required} joined
+          </span>
+
+          <span>{Math.round(progress)}%</span>
+        </div>
+
+        <div
+          className="home-progress-track"
+          role="progressbar"
+          aria-valuenow={deal.joined}
+          aria-valuemin={0}
+          aria-valuemax={deal.required}
+          aria-label={`${deal.name} buyers joined`}
+        >
+          <div
+            className="home-progress-fill"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <Link
+          to={`/deals/${deal.id}`}
+          className="home-deal-button"
+        >
+          View Deal
+          <ArrowRight size={16} />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+export default function Home() {
+  return (
+    <main>
+      {/* HERO SECTION */}
+
       <section className="home-hero">
-        <div className="container hero-container">
-
-          {/* HERO CONTENT */}
-          <div className="hero-content">
-
-            <span className="hero-label">
-              Smart Group Buying
-            </span>
+        <div className="home-hero-container">
+          <div className="home-hero-content">
+            <div className="home-hero-badge">
+              <ShoppingBag size={15} />
+              SMART GROUP SHOPPING
+            </div>
 
             <h1>
               Buy Together.
-              <span> Save More.</span>
+              <br />
+              <span>Save More.</span>
             </h1>
 
             <p>
-              Join other shoppers, reach the
-              group target and unlock better
+              Discover amazing deals, shop with your
+              community and unlock unbeatable group
               prices on products you love.
             </p>
 
-            <div className="hero-buttons">
-
+            <div className="home-hero-actions">
               <Link
                 to="/deals"
-                className="hero-primary-button"
+                className="home-primary-button"
               >
-                Browse Deals
+                Explore Deals
+                <ArrowRight size={18} />
               </Link>
 
               <Link
-                to="/register"
-                className="hero-secondary-button"
+                to="/how-it-works"
+                className="home-secondary-button"
               >
-                Get Started
+                How It Works
               </Link>
-
             </div>
 
-          </div>
-
-          {/* HERO IMAGE */}
-          <div className="hero-image">
-            <img
-              src={homeHero}
-              alt="BulkBuddy group buying"
-            />
-          </div>
-
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section className="how-it-works">
-        <div className="container">
-
-          <div className="section-heading">
-
-            <span>
-              Simple & Easy
-            </span>
-
-            <h2>
-              How BulkBuddy Works
-            </h2>
-
-            <p>
-              Save more in three simple steps.
-            </p>
-
-          </div>
-
-          <div className="steps-grid">
-
-            <div className="step-card">
-
-              <div className="step-icon">
-                🔎
+            <div className="home-hero-stats">
+              <div>
+                <strong>2,500+</strong>
+                <span>Happy Shoppers</span>
               </div>
 
-              <h3>
-                Find a Deal
-              </h3>
-
-              <p>
-                Browse available group deals
-                and choose a product you want.
-              </p>
-
-            </div>
-
-            <div className="step-card">
-
-              <div className="step-icon">
-                👥
+              <div>
+                <strong>500+</strong>
+                <span>Group Deals</span>
               </div>
 
-              <h3>
-                Join the Group
-              </h3>
-
-              <p>
-                Join other buyers before the
-                deal deadline and help reach
-                the target.
-              </p>
-
-            </div>
-
-            <div className="step-card">
-
-              <div className="step-icon">
-                💰
+              <div>
+                <strong>30%</strong>
+                <span>Average Savings</span>
               </div>
+            </div>
+          </div>
 
-              <h3>
-                Save More
-              </h3>
-
-              <p>
-                When the group target is
-                reached, everyone gets the
-                better group price.
-              </p>
-
+          <div className="home-hero-visual">
+            <div className="home-hero-image-frame">
+              <img
+                src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1100&q=90"
+                alt="Fashion shopping collection"
+              />
             </div>
 
+            <div className="home-floating-card home-floating-top">
+              <span className="home-floating-icon">
+                <Users size={19} />
+              </span>
+
+              <div>
+                <strong>Shop Together</strong>
+                <small>Better prices for everyone</small>
+              </div>
+            </div>
+
+            <div className="home-floating-card home-floating-bottom">
+              <span className="home-floating-icon pink">
+                <BadgePercent size={20} />
+              </span>
+
+              <div>
+                <strong>Save up to 40%</strong>
+                <small>With exclusive group deals</small>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FEATURED DEALS */}
-      <section className="featured-deals">
-        <div className="container">
+      {/* BENEFITS */}
 
-          <div className="featured-header">
+      <section className="home-benefits">
+        <div className="home-section-container">
+          <div className="home-benefits-grid">
+            {benefits.map((benefit) => {
+              const Icon = benefit.icon;
 
+              return (
+                <div
+                  key={benefit.title}
+                  className="home-benefit"
+                >
+                  <div className="home-benefit-icon">
+                    <Icon size={24} strokeWidth={2} />
+                  </div>
+
+                  <div>
+                    <h3>{benefit.title}</h3>
+                    <p>{benefit.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* TRENDING DEALS */}
+
+      <section className="home-trending">
+        <div className="home-section-container">
+          <div className="home-section-heading">
             <div>
-
-              <span className="featured-label">
-                Group Savings
+              <span className="home-section-eyebrow">
+                DON'T MISS OUT
               </span>
 
               <h2>
-                Active Deals
+                Trending <span>Group Deals</span>
               </h2>
 
               <p>
-                Join a group before the
-                deadline and unlock the
-                deal price.
+                Join popular deals before time runs out.
               </p>
-
             </div>
 
             <Link
               to="/deals"
-              className="all-deals-link"
+              className="home-view-all"
             >
-              View All Deals →
+              View All Deals
+              <ArrowRight size={18} />
             </Link>
-
           </div>
 
-          {/* LOADING */}
-          {loading && (
-            <p>
-              Loading deals...
-            </p>
-          )}
-
-          {/* ERROR */}
-          {!loading && error && (
-            <div className="home-deals-error">
-              {error}
-            </div>
-          )}
-
-          {/* DEALS */}
-          {!loading &&
-            !error &&
-            featuredDeals.length > 0 && (
-
-              <div className="deals-grid">
-
-                {featuredDeals.map(
-                  (deal) => (
-                    <DealCard
-                      key={deal.id}
-                      deal={deal}
-                    />
-                  )
-                )}
-
-              </div>
-            )}
-
-          {/* EMPTY */}
-          {!loading &&
-            !error &&
-            featuredDeals.length === 0 && (
-
-              <p>
-                No active deals available
-                right now.
-              </p>
-            )}
-
+          <div className="home-deals-grid">
+            {trendingDeals.map((deal) => (
+              <DealCard key={deal.id} deal={deal} />
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="home-cta">
-        <div className="container">
+      {/* BOTTOM CALL TO ACTION */}
 
-          <div className="cta-content">
-
+      <section className="home-cta-section">
+        <div className="home-cta">
+          <div>
             <h2>
-              Ready to start saving together?
+              Ready to start saving?
             </h2>
 
             <p>
-              Create your BulkBuddy account
-              and join your first group deal
-              today.
+              Discover the power of buying together
+              with BulkBuddy.
             </p>
-
-            <Link
-              to="/register"
-              className="cta-button"
-            >
-              Join BulkBuddy
-            </Link>
-
           </div>
 
+          <Link to="/register">
+            Join BulkBuddy
+            <ArrowRight size={18} />
+          </Link>
         </div>
       </section>
-
     </main>
   );
 }
-
-export default Home;

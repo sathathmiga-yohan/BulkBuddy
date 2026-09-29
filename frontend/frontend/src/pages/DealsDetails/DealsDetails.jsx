@@ -1,516 +1,817 @@
+
 import { useEffect, useState } from "react";
-import {
-  useParams,
-  Link,
-  useNavigate,
-} from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import {
-  getDealById,
-} from "../../services/dealservice";
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  Heart,
+  Minus,
+  Plus,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  Truck,
+  Users,
+} from "lucide-react";
 
 import {
-  joinDeal,
-  leaveDeal,
-  getMyDeals,
-} from "../../services/participationservice";
+  mockDeals,
+  formatPrice,
+} from "../../data/mockDeals.js";
 
 import "./DealsDetails.css";
 
-function DealDetails() {
-  const { dealId } = useParams();
-  const navigate = useNavigate();
+// Same key used in Createdeal.jsx and SellerDeals.jsx
+const STORAGE_KEY =
+  "bulkbuddy_seller_created_deals_v1";
 
-  const [deal, setDeal] = useState(null);
-  const [isJoined, setIsJoined] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] =
-    useState(false);
-  const [error, setError] = useState("");
+// Calculate the deadline for existing mock products.
+function getDeadline(daysLeft) {
+  const deadline = new Date();
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "null"
+  deadline.setDate(
+    deadline.getDate() + Number(daysLeft || 0)
   );
 
-  const token = localStorage.getItem("token");
+  deadline.setHours(23, 59, 59, 999);
 
-  // ==========================================
-  // LOAD ONE DEAL
-  // ==========================================
-  const loadDeal = async () => {
-    try {
-      const data = await getDealById(dealId);
+  return deadline;
+}
 
-      setDeal(data);
-    } catch (error) {
-      console.error(
-        "Load deal error:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          "Failed to load deal."
-      );
-    }
-  };
-
-  // ==========================================
-  // CHECK CUSTOMER ALREADY JOINED
-  // ==========================================
-  const checkJoinedStatus = async () => {
-    if (
-      !token ||
-      user?.role !== "CUSTOMER"
-    ) {
-      setIsJoined(false);
-      return;
-    }
-
-    try {
-      const myDeals = await getMyDeals();
-
-      const joined =
-        Array.isArray(myDeals) &&
-        myDeals.some(
-          (item) =>
-            Number(item.id) ===
-            Number(dealId)
-        );
-
-      setIsJoined(joined);
-    } catch (error) {
-      console.error(
-        "Check joined status error:",
-        error
-      );
-
-      setIsJoined(false);
-    }
-  };
-
-  // ==========================================
-  // LOAD PAGE
-  // ==========================================
-  useEffect(() => {
-    const loadPage = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        await loadDeal();
-        await checkJoinedStatus();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPage();
-  }, [dealId]);
-
-  // ==========================================
-  // JOIN DEAL
-  // ==========================================
-  const handleJoin = async () => {
-    if (!token || !user) {
-      alert(
-        "Please login as a customer to join."
-      );
-
-      navigate("/login");
-      return;
-    }
-
-    if (user.role !== "CUSTOMER") {
-      alert(
-        "Only customers can join deals."
-      );
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setError("");
-
-      await joinDeal(dealId);
-
-      setIsJoined(true);
-
-      // Get updated current_participants
-      await loadDeal();
-
-      alert(
-        "Successfully joined the deal!"
-      );
-    } catch (error) {
-      console.error(
-        "Join error:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          "Failed to join deal."
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // ==========================================
-  // LEAVE DEAL
-  // ==========================================
-  const handleLeave = async () => {
-    try {
-      setActionLoading(true);
-      setError("");
-
-      await leaveDeal(dealId);
-
-      setIsJoined(false);
-
-      // Get updated current_participants
-      await loadDeal();
-
-      alert("You left the deal.");
-    } catch (error) {
-      console.error(
-        "Leave error:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          "Failed to leave deal."
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // ==========================================
-  // LOADING
-  // ==========================================
-  if (loading) {
-    return (
-      <main className="deal-details-page">
-        <div className="container">
-          <p>Loading deal...</p>
-        </div>
-      </main>
-    );
-  }
-
-  // ==========================================
-  // DEAL NOT FOUND
-  // ==========================================
-  if (!deal) {
-    return (
-      <main className="deal-details-page">
-        <div className="container">
-          <p>
-            {error || "Deal not found."}
-          </p>
-
-          <Link to="/deals">
-            ← Back to Deals
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  // ==========================================
-  // EXACT BACKEND DEAL RESPONSE
-  // ==========================================
-  const productName =
-    deal.product_name || "Deal";
-
-  const description =
-    deal.description ||
-    "No description available.";
-
-  const normalPrice = Number(
-    deal.normal_price ?? 0
-  );
-
-  const groupPrice = Number(
-    deal.group_price ?? 0
-  );
-
-  const minimumBuyers = Number(
-    deal.minimum_buyers ?? 0
-  );
-
-  // Exact backend field
-  const currentBuyers = Number(
-    deal.current_participants ?? 0
-  );
-
-  // Exact backend field
-  const remainingBuyers = Number(
-    deal.remaining_target ?? 0
-  );
-
-  // Exact backend field
-  const availableCapacity = Number(
-    deal.available_capacity ?? 0
-  );
-
-  // ==========================================
-  // PROGRESS
-  // ==========================================
-  const progress =
-    minimumBuyers > 0
-      ? Math.min(
-          (currentBuyers /
-            minimumBuyers) *
-            100,
-          100
-        )
-      : 0;
-
-  // ==========================================
-  // SAVINGS
-  // ==========================================
-  const savings = Math.max(
-    normalPrice - groupPrice,
+// Countdown calculation
+function getTimeRemaining(deadline) {
+  const difference = Math.max(
+    deadline.getTime() - Date.now(),
     0
   );
 
-  const savingsPercentage =
-    normalPrice > 0
-      ? Math.round(
-          (savings / normalPrice) * 100
-        )
-      : 0;
+  return {
+    days: Math.floor(
+      difference / (1000 * 60 * 60 * 24)
+    ),
 
-  // ==========================================
-  // DEADLINE
-  // ==========================================
-  const deadline = deal.deadline
-    ? new Date(
-        deal.deadline
-      ).toLocaleString()
-    : "Not available";
+    hours: Math.floor(
+      (difference / (1000 * 60 * 60)) % 24
+    ),
+
+    minutes: Math.floor(
+      (difference / (1000 * 60)) % 60
+    ),
+
+    seconds: Math.floor(
+      (difference / 1000) % 60
+    ),
+  };
+}
+
+// Countdown component
+function Countdown({ deadline }) {
+  const [remaining, setRemaining] = useState(
+    () => getTimeRemaining(deadline)
+  );
+
+  useEffect(() => {
+    setRemaining(getTimeRemaining(deadline));
+
+    const interval = setInterval(() => {
+      setRemaining(getTimeRemaining(deadline));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [deadline]);
+
+  const units = [
+    {
+      label: "Days",
+      value: remaining.days,
+    },
+    {
+      label: "Hours",
+      value: remaining.hours,
+    },
+    {
+      label: "Mins",
+      value: remaining.minutes,
+    },
+    {
+      label: "Secs",
+      value: remaining.seconds,
+    },
+  ];
 
   return (
-    <main className="deal-details-page">
-      <div className="container">
-
-        {/* BACK */}
-        <Link
-          to="/deals"
-          className="back-deals"
+    <div className="detail-countdown">
+      {units.map((unit) => (
+        <div
+          className="detail-countdown-unit"
+          key={unit.label}
         >
-          ← Back to Deals
+          <strong>
+            {String(unit.value).padStart(2, "0")}
+          </strong>
+
+          <span>{unit.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Find both seller-created and original mock deals.
+function findDeal(id) {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) || "[]"
+    );
+
+    const createdDeals = Array.isArray(saved)
+      ? saved
+      : [];
+
+    const sellerDeal = createdDeals.find(
+      (deal) =>
+        String(deal.id) === String(id) &&
+        deal.status === "active"
+    );
+
+    if (sellerDeal) {
+      return sellerDeal;
+    }
+  } catch (error) {
+    console.error(
+      "Unable to load seller-created deal:",
+      error
+    );
+  }
+
+  return mockDeals.find(
+    (deal) => String(deal.id) === String(id)
+  );
+}
+
+// Main product details page
+export default function DealDetails() {
+  const { id } = useParams();
+
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      setRevision((current) => current + 1);
+    };
+
+    window.addEventListener(
+      "bulkbuddy-deals-updated",
+      refresh
+    );
+
+    window.addEventListener(
+      "storage",
+      refresh
+    );
+
+    return () => {
+      window.removeEventListener(
+        "bulkbuddy-deals-updated",
+        refresh
+      );
+
+      window.removeEventListener(
+        "storage",
+        refresh
+      );
+    };
+  }, []);
+
+  // Revision causes findDeal to run again
+  // after changes to browser storage.
+  void revision;
+
+  const deal = findDeal(id);
+
+  if (!deal) {
+    return (
+      <main className="detail-not-found">
+        <h1>Deal not found</h1>
+
+        <p>
+          This deal may no longer be available.
+        </p>
+
+        <Link to="/deals">
+          <ArrowLeft size={17} />
+          Back to Deals
         </Link>
+      </main>
+    );
+  }
 
-        {/* ERROR */}
-        {error && (
-          <div className="register-error">
-            {error}
-          </div>
-        )}
+  return (
+    <DealDetailsContent
+      key={`${deal.id}-${deal.name}-${deal.groupPrice}-${deal.endDate}`}
+      deal={deal}
+    />
+  );
+}
 
-        <div className="deal-details-grid">
+// Product information and customer interaction
+function DealDetailsContent({ deal }) {
+  const [quantity, setQuantity] = useState(1);
 
-          {/* VISUAL */}
-          <div className="deal-visual">
+  const [isFavourite, setIsFavourite] =
+    useState(false);
 
-            <span className="details-status">
-              {deal.status}
-            </span>
+  const [activeTab, setActiveTab] =
+    useState("description");
 
-            <div className="details-product-icon">
-              🛍️
+  const [selectedImage, setSelectedImage] =
+    useState(deal.image);
+
+  const [showJoinMessage, setShowJoinMessage] =
+    useState(false);
+
+  const [demoJoined, setDemoJoined] =
+    useState(false);
+
+  const [deadline] = useState(() =>
+    deal.endDate
+      ? new Date(`${deal.endDate}T23:59:59`)
+      : getDeadline(deal.daysLeft)
+  );
+
+  // Existing design displays three thumbnails.
+  const images = [
+    deal.image,
+    deal.image,
+    deal.image,
+  ];
+
+  const joinedCount =
+    Number(deal.joined || 0) +
+    (demoJoined ? quantity : 0);
+
+  const availableQuantity = Math.max(
+    Number(deal.maxQuantity || 0) - joinedCount,
+    0
+  );
+
+  const progress = Math.min(
+    (joinedCount / Number(deal.required || 1)) * 100,
+    100
+  );
+
+  const handleJoin = () => {
+    if (
+      demoJoined ||
+      availableQuantity < quantity
+    ) {
+      return;
+    }
+
+    setDemoJoined(true);
+    setShowJoinMessage(true);
+  };
+
+  return (
+    <main className="detail-page">
+      <div className="detail-container">
+
+        {/* BREADCRUMB */}
+
+        <nav
+          className="detail-breadcrumb"
+          aria-label="Breadcrumb"
+        >
+          <Link to="/">Home</Link>
+
+          <span>/</span>
+
+          <Link to="/deals">Deals</Link>
+
+          <span>/</span>
+
+          <strong>{deal.name}</strong>
+        </nav>
+
+        {/* MAIN PRODUCT SECTION */}
+
+        <section className="detail-product-layout">
+
+          {/* LEFT: PRODUCT IMAGES */}
+
+          <div className="detail-gallery">
+            <div className="detail-main-image">
+              <img
+                src={selectedImage}
+                alt={deal.name}
+              />
+
+              <span className="detail-discount">
+                {deal.discount}% OFF
+              </span>
             </div>
 
+            <div className="detail-thumbnails">
+              {images.map((image, index) => (
+                <button
+                  type="button"
+                  key={index}
+                  className={
+                    selectedImage === image &&
+                    index === 0
+                      ? "active"
+                      : ""
+                  }
+                  onClick={() =>
+                    setSelectedImage(image)
+                  }
+                  aria-label={`View product image ${
+                    index + 1
+                  }`}
+                >
+                  <img
+                    src={image}
+                    alt={`${deal.name} view ${
+                      index + 1
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <p className="detail-image-note">
+              Product images are for demonstration.
+            </p>
           </div>
 
-          {/* INFORMATION */}
-          <div className="deal-information">
+          {/* RIGHT: PRODUCT DETAILS */}
 
-            <span className="details-label">
-              Group Deal
-            </span>
+          <div className="detail-information">
 
-            <h1>{productName}</h1>
+            {/* CATEGORY AND RATING */}
 
-            <p className="details-description">
-              {description}
+            <div className="detail-category-row">
+              <span className="detail-category">
+                {deal.category}
+              </span>
+
+              <span className="detail-rating">
+                <Star
+                  size={15}
+                  fill="currentColor"
+                />
+
+                {deal.rating}
+
+                <small>(Demo rating)</small>
+              </span>
+            </div>
+
+            <h1>{deal.name}</h1>
+
+            <p className="detail-seller">
+              Sold by{" "}
+              <strong>
+                {deal.seller}
+              </strong>
             </p>
 
-            {/* PRICES */}
-            <div className="details-price-section">
+            <p className="detail-description">
+              {deal.description}
+            </p>
 
-              <div>
-                <span className="price-title">
-                  Normal Price
-                </span>
+            {/* PRICE */}
 
-                <span className="details-normal-price">
-                  Rs.{" "}
-                  {normalPrice.toLocaleString()}
-                </span>
+            <div className="detail-price-box">
+              <span className="detail-price-label">
+                EXCLUSIVE GROUP PRICE
+              </span>
+
+              <div className="detail-prices">
+                <strong>
+                  {formatPrice(deal.groupPrice)}
+                </strong>
+
+                <del>
+                  {formatPrice(deal.originalPrice)}
+                </del>
               </div>
 
-              <div>
-                <span className="price-title">
-                  Group Price
-                </span>
-
-                <span className="details-group-price">
-                  Rs.{" "}
-                  {groupPrice.toLocaleString()}
-                </span>
-              </div>
-
+              <span className="detail-saving">
+                Save{" "}
+                {formatPrice(
+                  deal.originalPrice -
+                    deal.groupPrice
+                )}
+              </span>
             </div>
 
-            {/* SAVINGS */}
-            <div className="saving-box">
-              You save{" "}
+            {/* GROUP BUYING INFORMATION */}
 
-              <strong>
-                Rs.{" "}
-                {savings.toLocaleString()}
-              </strong>{" "}
+            <div className="detail-group-box">
+              <div className="detail-group-title">
+                <h2>
+                  <Users size={19} />
+                  Group Buying Progress
+                </h2>
 
-              ({savingsPercentage}%)
-            </div>
-
-            {/* PROGRESS */}
-            <div className="group-progress-section">
-
-              <div className="progress-heading">
-
-                <span>
-                  {currentBuyers} buyers joined
+                <span className="detail-live-badge">
+                  ACTIVE DEAL
                 </span>
-
-                <span>
-                  Target: {minimumBuyers}
-                </span>
-
               </div>
 
-              <div className="details-progress">
+              <div className="detail-progress-numbers">
+                <div>
+                  <strong>
+                    {joinedCount}
+                  </strong>
 
+                  <span>
+                    Buyers Joined
+                  </span>
+                </div>
+
+                <div>
+                  <strong>
+                    {deal.required}
+                  </strong>
+
+                  <span>
+                    Minimum Buyers
+                  </span>
+                </div>
+
+                <div>
+                  <strong>
+                    {availableQuantity}
+                  </strong>
+
+                  <span>
+                    Spots Left
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="detail-progress-track"
+                role="progressbar"
+                aria-label="Buyers joined"
+                aria-valuenow={Math.min(
+                  joinedCount,
+                  deal.required
+                )}
+                aria-valuemin={0}
+                aria-valuemax={deal.required}
+              >
                 <div
-                  className="details-progress-bar"
                   style={{
                     width: `${progress}%`,
                   }}
                 />
-
               </div>
 
-              <p className="remaining-text">
-                {remainingBuyers > 0
-                  ? `${remainingBuyers} more buyer${
-                      remainingBuyers > 1
-                        ? "s"
-                        : ""
-                    } needed to reach the target.`
-                  : "Group target reached!"}
+              <p className="detail-progress-message">
+                {joinedCount >= deal.required
+                  ? "Minimum buyer target reached!"
+                  : `${
+                      deal.required - joinedCount
+                    } more buyers needed to unlock this deal.`}
               </p>
-
             </div>
 
-            {/* STATS */}
-            <div className="deal-stat-grid">
+            {/* COUNTDOWN */}
 
-              <div className="deal-stat">
-                <span>👥</span>
+            <div className="detail-deadline-box">
+              <div className="detail-deadline-heading">
+                <Clock3 size={18} />
 
-                <div>
-                  <small>Joined</small>
-
-                  <strong>
-                    {currentBuyers}
-                  </strong>
-                </div>
+                <strong>
+                  Deal Ends In
+                </strong>
               </div>
 
-              <div className="deal-stat">
-                <span>📦</span>
-
-                <div>
-                  <small>Available</small>
-
-                  <strong>
-                    {availableCapacity}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="deal-stat">
-                <span>⏱️</span>
-
-                <div>
-                  <small>Deadline</small>
-
-                  <strong>
-                    {deadline}
-                  </strong>
-                </div>
-              </div>
-
+              <Countdown
+                deadline={deadline}
+              />
             </div>
 
-            {/* JOIN / LEAVE */}
-            {user?.role === "CUSTOMER" &&
-            isJoined ? (
+            {/* QUANTITY */}
+
+            <div className="detail-quantity-row">
+              <div>
+                <strong>
+                  Quantity
+                </strong>
+
+                <p>
+                  Maximum {deal.maxQuantity} units
+                  in this mock deal
+                </p>
+              </div>
+
+              <div className="detail-quantity-control">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuantity((current) =>
+                      Math.max(1, current - 1)
+                    )
+                  }
+                  disabled={
+                    quantity <= 1 ||
+                    demoJoined
+                  }
+                  aria-label="Decrease quantity"
+                >
+                  <Minus size={16} />
+                </button>
+
+                <span>
+                  {quantity}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuantity((current) =>
+                      Math.min(
+                        availableQuantity,
+                        current + 1
+                      )
+                    )
+                  }
+                  disabled={
+                    quantity >= availableQuantity ||
+                    demoJoined
+                  }
+                  aria-label="Increase quantity"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+
+            <div className="detail-actions">
               <button
                 type="button"
-                className="join-group-button"
-                onClick={handleLeave}
-                disabled={actionLoading}
-              >
-                {actionLoading
-                  ? "Leaving..."
-                  : "Leave Deal"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="join-group-button"
+                className="detail-join-button"
                 onClick={handleJoin}
                 disabled={
-                  actionLoading ||
-                  availableCapacity <= 0 ||
-                  deal.status !== "ACTIVE"
+                  demoJoined ||
+                  availableQuantity === 0
                 }
               >
-                {actionLoading
-                  ? "Joining..."
-                  : availableCapacity <= 0
-                  ? "Deal Full"
-                  : deal.status !== "ACTIVE"
-                  ? deal.status
-                  : "Join Group"}
+                {demoJoined ? (
+                  <>
+                    <CheckCircle2 size={19} />
+                    Joined (Demo)
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag size={19} />
+                    Join Group Deal
+                    <ArrowRight size={17} />
+                  </>
+                )}
               </button>
+
+              <button
+                type="button"
+                className={`detail-wishlist-button ${
+                  isFavourite
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setIsFavourite(
+                    (current) => !current
+                  )
+                }
+                aria-pressed={isFavourite}
+              >
+                <Heart
+                  size={19}
+                  fill={
+                    isFavourite
+                      ? "currentColor"
+                      : "none"
+                  }
+                />
+
+                {isFavourite
+                  ? "Wishlisted"
+                  : "Add to Wishlist"}
+              </button>
+            </div>
+
+            {/* JOIN MESSAGE */}
+
+            {showJoinMessage && (
+              <div
+                className="detail-join-message"
+                role="status"
+              >
+                <CheckCircle2 size={19} />
+
+                <p>
+                  Demo successful! Your selected
+                  quantity has been added to the
+                  on-screen buyer count. No actual
+                  order has been placed.
+                </p>
+              </div>
             )}
 
-            {/* NOTE */}
-            {isJoined ? (
-              <p className="join-note">
-                ✓ You have joined this group
-                deal.
-              </p>
-            ) : (
-              <p className="join-note">
-                Join before the deadline to
-                participate in this group deal.
-              </p>
-            )}
+            {/* TRUST INFORMATION */}
 
+            <div className="detail-trust-row">
+              <span>
+                <ShieldCheck size={17} />
+                Trusted Seller
+              </span>
+
+              <span>
+                <Truck size={17} />
+                Delivery After Success
+              </span>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* PRODUCT INFORMATION TABS */}
+
+        <section className="detail-tabs-section">
+          <div
+            className="detail-tabs"
+            role="tablist"
+            aria-label="Product information"
+          >
+            {[
+              [
+                "description",
+                "Description",
+              ],
+              [
+                "specifications",
+                "Specifications",
+              ],
+              [
+                "reviews",
+                "Reviews",
+              ],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={
+                  activeTab === value
+                }
+                className={
+                  activeTab === value
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveTab(value)
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="detail-tab-content">
+
+            {/* DESCRIPTION TAB */}
+
+            {activeTab === "description" && (
+              <div>
+                <h2>
+                  Product Description
+                </h2>
+
+                <p>
+                  {deal.description}
+                </p>
+
+                <p>
+                  Join this group deal with other
+                  BulkBuddy shoppers. When the
+                  minimum number of buyers is
+                  reached before the deadline,
+                  the deal can proceed at the
+                  group price.
+                </p>
+              </div>
+            )}
+
+            {/* SPECIFICATIONS TAB */}
+
+            {activeTab === "specifications" && (
+              <div>
+                <h2>
+                  Product Specifications
+                </h2>
+
+                <table className="detail-spec-table">
+                  <tbody>
+                    <tr>
+                      <th>
+                        Product
+                      </th>
+
+                      <td>
+                        {deal.name}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th>
+                        Category
+                      </th>
+
+                      <td>
+                        {deal.category}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th>
+                        Seller
+                      </th>
+
+                      <td>
+                        {deal.seller}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th>
+                        Minimum Buyers
+                      </th>
+
+                      <td>
+                        {deal.required}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th>
+                        Maximum Quantity
+                      </th>
+
+                      <td>
+                        {deal.maxQuantity}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p className="detail-spec-note">
+                  Detailed technical
+                  specifications will be
+                  supplied by sellers.
+                </p>
+              </div>
+            )}
+
+            {/* REVIEWS TAB */}
+
+            {activeTab === "reviews" && (
+              <div>
+                <h2>
+                  Customer Reviews
+                </h2>
+
+                <div className="detail-reviews-empty">
+                  <Star size={30} />
+
+                  <p>
+                    Verified customer reviews
+                    will appear here.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* BACK TO DEALS */}
+
+        <Link
+          to="/deals"
+          className="detail-back-link"
+        >
+          <ArrowLeft size={17} />
+          Back to All Deals
+        </Link>
       </div>
     </main>
   );
 }
-
-export default DealDetails;

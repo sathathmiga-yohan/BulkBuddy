@@ -1,372 +1,378 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
+import { useMemo, useState } from "react";
 import {
-  getDealOutcomes,
-  getParticipationReport,
-  getSellerSales,
-} from "../../../services/reportservice";
-
+  BarChart3, CheckCircle2, Clock3,
+  Download, FileSpreadsheet, Search,
+  TrendingUp, Users, XCircle
+} from "lucide-react";
+import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
+import { sellerDeals } from "../sellerMockData.js";
+import { formatPrice } from "../../../data/mockDeals.js";
 import "./Reports.css";
 
-function Reports() {
-  const [outcomes, setOutcomes] = useState(null);
+function downloadCSV(rows, filename) {
+  const headers = [
+    "Deal ID",
+    "Deal Name",
+    "Category",
+    "Group Price (LKR)",
+    "Participants",
+    "Required Buyers",
+    "Status",
+    "End Date"
+  ];
 
-  const [participation, setParticipation] =
-    useState(null);
+  const values = rows.map(deal => [
+    deal.id,
+    deal.name,
+    deal.category,
+    deal.groupPrice,
+    deal.participants,
+    deal.required,
+    deal.status,
+    deal.endDate
+  ]);
 
-  const [sales, setSales] = useState(null);
+  const escapeCell = value =>
+    `"${String(value ?? "").replace(/"/g, '""')}"`;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const csv = [headers, ...values]
+    .map(row => row.map(escapeCell).join(","))
+    .join("\r\n");
 
-  useEffect(() => {
-    const loadReports = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const blob = new Blob(
+    ["\uFEFF" + csv],
+    { type: "text/csv;charset=utf-8;" }
+  );
 
-        const [
-          outcomeData,
-          participationData,
-          salesData,
-        ] = await Promise.all([
-          getDealOutcomes(),
-          getParticipationReport(),
-          getSellerSales(),
-        ]);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 
-        setOutcomes(outcomeData);
-        setParticipation(participationData);
-        setSales(salesData);
-      } catch (error) {
-        console.error(
-          "Reports error:",
-          error
-        );
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-        setError(
-          error.response?.data?.detail ||
-            "Failed to load reports."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+export default function Reports() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
-    loadReports();
-  }, []);
+  const invalidRange =
+    Boolean(startDate && endDate && startDate > endDate);
 
-  // ==========================================
-  // DEAL OUTCOME REPORT
-  // Backend:
-  // {
-  //   total_deals,
-  //   deals: [...]
-  // }
-  // ==========================================
+  const filtered = useMemo(() => {
+    if (invalidRange) return [];
 
-  const outcomeDeals =
-    outcomes?.deals || [];
+    return sellerDeals.filter(deal => {
+      const matchesSearch =
+        `${deal.name} ${deal.category}`
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
-  const totalDeals =
-    outcomes?.total_deals ?? 0;
+      const matchesStatus =
+        status === "all" || deal.status === status;
 
-  // ==========================================
-  // PARTICIPATION REPORT
-  // Backend directly gives these values
-  // ==========================================
+      const matchesStart =
+        !startDate || deal.endDate >= startDate;
 
-  const activeDeals =
-    participation?.active_deals ?? 0;
+      const matchesEnd =
+        !endDate || deal.endDate <= endDate;
 
-  const successfulDeals =
-    participation?.successful_deals ?? 0;
+      return matchesSearch &&
+        matchesStatus &&
+        matchesStart &&
+        matchesEnd;
+    });
+  }, [search, status, startDate, endDate, invalidRange]);
 
-  const failedDeals =
-    participation?.failed_deals ?? 0;
+  const totalParticipants = filtered.reduce(
+    (sum, deal) => sum + deal.participants,
+    0
+  );
 
-  const totalParticipants =
-    participation?.total_participations ?? 0;
+  const successful = filtered.filter(
+    deal => deal.status === "successful"
+  ).length;
 
-  // ==========================================
-  // SALES REPORT
-  // Backend field:
-  // committed_sales_value
-  // ==========================================
+  const active = filtered.filter(
+    deal => deal.status === "active"
+  ).length;
 
-  const totalSales =
-    sales?.committed_sales_value ?? 0;
+  const failed = filtered.filter(
+    deal => deal.status === "failed"
+  ).length;
+
+  // Estimated value based on joined buyers in this demo.
+  // This is not verified revenue or received payment.
+  const estimatedValue = filtered.reduce(
+    (sum, deal) =>
+      sum + deal.groupPrice * deal.participants,
+    0
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatus("all");
+    setStartDate("");
+    setEndDate("");
+  };
 
   return (
-    <main className="reports-page">
-      <div className="container">
-
-        <Link
-          to="/seller/dashboard"
-          className="reports-back"
-        >
-          ← Back to Dashboard
-        </Link>
-
-        <div className="reports-header">
-          <span>Seller Center</span>
-
-          <h1>Deal Reports</h1>
-
+    <SellerLayout title="Reports">
+      <section className="sr-intro">
+        <div>
+          <small>SELLER ANALYTICS</small>
+          <h2>Deal Performance Reports</h2>
           <p>
-            Track your deal performance and
-            customer participation.
+            Explore your group deals, filter results
+            and export a CSV report.
           </p>
         </div>
 
-        {loading && (
-          <p>Loading reports...</p>
-        )}
+        <button
+          type="button"
+          className="sr-download"
+          disabled={filtered.length === 0 || invalidRange}
+          onClick={() =>
+            downloadCSV(
+              filtered,
+              "bulkbuddy-seller-report.csv"
+            )
+          }
+        >
+          <Download size={18} />
+          Download CSV
+        </button>
+      </section>
 
-        {error && (
-          <div className="reports-error">
-            {error}
+      <section className="sr-stats">
+        {[
+          {
+            title: "Filtered Deals",
+            value: filtered.length,
+            icon: BarChart3
+          },
+          {
+            title: "Successful Deals",
+            value: successful,
+            icon: CheckCircle2
+          },
+          {
+            title: "Total Participants",
+            value: totalParticipants,
+            icon: Users
+          },
+          {
+            title: "Estimated Deal Value",
+            value: formatPrice(estimatedValue),
+            icon: TrendingUp
+          }
+        ].map(item => {
+          const Icon = item.icon;
+          return (
+            <article className="sr-stat" key={item.title}>
+              <div className="sr-stat-icon">
+                <Icon size={22} />
+              </div>
+              <span>{item.title}</span>
+              <strong>{item.value}</strong>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="sr-panel">
+        <div className="sr-panel-heading">
+          <div>
+            <h2>Filter Reports</h2>
+            <p>Dates refer to the deal end date.</p>
           </div>
-        )}
+        </div>
 
-        {!loading && !error && (
-          <>
-            {/* ============================= */}
-            {/* TOP SUMMARY */}
-            {/* ============================= */}
-
-            <div className="report-summary-grid">
-
-              <div className="report-summary-card">
-                <div className="report-icon">
-                  📦
-                </div>
-
-                <div>
-                  <p>Total Deals</p>
-                  <h2>{totalDeals}</h2>
-                </div>
-              </div>
-
-              <div className="report-summary-card">
-                <div className="report-icon">
-                  🔥
-                </div>
-
-                <div>
-                  <p>Active Deals</p>
-                  <h2>{activeDeals}</h2>
-                </div>
-              </div>
-
-              <div className="report-summary-card">
-                <div className="report-icon">
-                  ✅
-                </div>
-
-                <div>
-                  <p>Successful</p>
-                  <h2>{successfulDeals}</h2>
-                </div>
-              </div>
-
-              <div className="report-summary-card">
-                <div className="report-icon">
-                  👥
-                </div>
-
-                <div>
-                  <p>Participants</p>
-                  <h2>{totalParticipants}</h2>
-                </div>
-              </div>
-
+        <div className="sr-filters">
+          <label>
+            Search Deal
+            <div className="sr-search">
+              <Search size={17} />
+              <input
+                type="search"
+                placeholder="Search product..."
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+              />
             </div>
+          </label>
 
-            {/* ============================= */}
-            {/* DEAL OUTCOME SECTION */}
-            {/* ============================= */}
+          <label>
+            Status
+            <select
+              value={status}
+              onChange={event => setStatus(event.target.value)}
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="successful">Successful</option>
+              <option value="failed">Failed</option>
+            </select>
+          </label>
 
-            <section className="report-section">
+          <label>
+            From Date
+            <input
+              type="date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={event => setStartDate(event.target.value)}
+            />
+          </label>
 
-              <div className="report-section-heading">
-                <div>
-                  <h2>Deal Outcomes</h2>
+          <label>
+            To Date
+            <input
+              type="date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={event => setEndDate(event.target.value)}
+            />
+          </label>
 
-                  <p>
-                    Summary of your group-buying
-                    deal performance.
-                  </p>
-                </div>
-              </div>
+          <button
+            type="button"
+            className="sr-reset"
+            onClick={resetFilters}
+          >
+            Reset
+          </button>
+        </div>
 
-              <div className="report-summary-grid">
-
-                <div className="report-summary-card">
-                  <div className="report-icon">
-                    📊
-                  </div>
-
-                  <div>
-                    <p>Successful Deals</p>
-                    <h2>
-                      {successfulDeals}
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="report-summary-card">
-                  <div className="report-icon">
-                    ❌
-                  </div>
-
-                  <div>
-                    <p>Failed Deals</p>
-                    <h2>
-                      {failedDeals}
-                    </h2>
-                  </div>
-                </div>
-
-                <div className="report-summary-card">
-                  <div className="report-icon">
-                    💰
-                  </div>
-
-                  <div>
-                    <p>Committed Sales</p>
-
-                    <h2>
-                      Rs.{" "}
-                      {Number(
-                        totalSales
-                      ).toLocaleString()}
-                    </h2>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* =========================== */}
-              {/* DEAL TABLE */}
-              {/* =========================== */}
-
-              {outcomeDeals.length > 0 ? (
-                <div className="report-table-wrapper">
-
-                  <table className="report-table">
-
-                    <thead>
-                      <tr>
-                        <th>Deal</th>
-                        <th>Participants</th>
-                        <th>Target</th>
-                        <th>Progress</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-
-                      {outcomeDeals.map(
-                        (deal) => {
-
-                          const participants =
-                            Number(
-                              deal.participant_count ??
-                                0
-                            );
-
-                          const target =
-                            Number(
-                              deal.minimum_buyers ??
-                                0
-                            );
-
-                          const progress =
-                            target > 0
-                              ? Math.min(
-                                  (participants /
-                                    target) *
-                                    100,
-                                  100
-                                )
-                              : 0;
-
-                          return (
-                            <tr
-                              key={deal.deal_id}
-                            >
-
-                              <td className="report-product">
-                                {
-                                  deal.product_name
-                                }
-                              </td>
-
-                              <td>
-                                {participants}
-                              </td>
-
-                              <td>
-                                {target}
-                              </td>
-
-                              <td>
-                                <div className="report-progress-wrapper">
-
-                                  <div className="report-progress">
-                                    <div
-                                      className="report-progress-fill"
-                                      style={{
-                                        width: `${progress}%`,
-                                      }}
-                                    />
-                                  </div>
-
-                                  <span>
-                                    {Math.round(
-                                      progress
-                                    )}
-                                    %
-                                  </span>
-
-                                </div>
-                              </td>
-
-                              <td>
-                                <span
-                                  className={`report-status ${String(
-                                    deal.status
-                                  ).toLowerCase()}`}
-                                >
-                                  {deal.status}
-                                </span>
-                              </td>
-
-                            </tr>
-                          );
-                        }
-                      )}
-
-                    </tbody>
-                  </table>
-
-                </div>
-              ) : (
-                <p>
-                  No deal report data available.
-                </p>
-              )}
-
-            </section>
-          </>
+        {invalidRange && (
+          <p className="sr-error" role="alert">
+            From Date cannot be later than To Date.
+          </p>
         )}
+      </section>
 
-      </div>
-    </main>
+      <section className="sr-panel">
+        <div className="sr-panel-heading">
+          <div>
+            <h2>Deal Reports</h2>
+            <p>
+              Showing {filtered.length} of {sellerDeals.length} demo deals
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="sr-export-secondary"
+            disabled={filtered.length === 0 || invalidRange}
+            onClick={() =>
+              downloadCSV(
+                filtered,
+                "bulkbuddy-filtered-deals.csv"
+              )
+            }
+          >
+            <FileSpreadsheet size={17} />
+            Export CSV
+          </button>
+        </div>
+
+        <div className="sr-table-wrap">
+          <table className="sr-table">
+            <thead>
+              <tr>
+                <th>Deal Name</th>
+                <th>Category</th>
+                <th>Group Price</th>
+                <th>Buyers</th>
+                <th>Progress</th>
+                <th>Status</th>
+                <th>End Date</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filtered.map(deal => {
+                const progress = Math.min(
+                  Math.round(
+                    deal.participants / deal.required * 100
+                  ),
+                  100
+                );
+
+                return (
+                  <tr key={deal.id}>
+                    <td>
+                      <strong>{deal.name}</strong>
+                    </td>
+                    <td>{deal.category}</td>
+                    <td className="sr-price">
+                      {formatPrice(deal.groupPrice)}
+                    </td>
+                    <td>
+                      {deal.participants}/{deal.required}
+                    </td>
+                    <td>
+                      <div className="sr-progress-label">
+                        {progress}%
+                      </div>
+                      <div className="sr-progress">
+                        <span
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`sr-status ${deal.status}`}>
+                        {deal.status}
+                      </span>
+                    </td>
+                    <td>{deal.endDate}</td>
+                  </tr>
+                );
+              })}
+
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="sr-empty">
+                    No matching reports found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="sr-summary">
+        <div>
+          <Clock3 size={19} />
+          <span>Active</span>
+          <strong>{active}</strong>
+        </div>
+        <div>
+          <CheckCircle2 size={19} />
+          <span>Successful</span>
+          <strong>{successful}</strong>
+        </div>
+        <div>
+          <XCircle size={19} />
+          <span>Failed</span>
+          <strong>{failed}</strong>
+        </div>
+      </section>
+
+      <p className="sr-disclaimer">
+        All figures are mock data. Estimated Deal Value
+        is calculated from group price multiplied by
+        participant count; it does not represent
+        confirmed revenue or payments.
+      </p>
+    </SellerLayout>
   );
 }
-
-export default Reports;
