@@ -1,319 +1,194 @@
-import { useEffect, useState } from "react";
+
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getSellerDeals } from "../../../services/dealservice";
+import {
+  ArrowRight, CheckCircle2, Clock3,
+  FileSpreadsheet, Package, Plus,
+  Search, TrendingUp, Users
+} from "lucide-react";
+import SellerLayout from "./SellerLayout.jsx";
+import { sellerDeals, sellerStats } from "../sellerMockData.js";
+import { formatPrice } from "../../../data/mockDeals.js";
 import "./SellerDashboard.css";
 
-function SellerDashboard() {
-  const [deals, setDeals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+export default function SellerDashboard() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
 
-  // ==========================================
-  // LOAD SELLER DEALS
-  // ==========================================
-  useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const filtered = useMemo(() => {
+    return sellerDeals.filter(deal => {
+      const matchesSearch =
+        `${deal.name} ${deal.category}`
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
-        const data = await getSellerDeals();
+      return matchesSearch &&
+        (status === "all" || deal.status === status);
+    });
+  }, [search, status]);
 
-        setDeals(
-          Array.isArray(data) ? data : []
-        );
-      } catch (error) {
-        console.error(
-          "Dashboard error:",
-          error
-        );
-
-        setError(
-          error.response?.data?.detail ||
-            "Failed to load dashboard."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboard();
-  }, []);
-
-  // ==========================================
-  // PARTICIPANT COUNT
-  // ==========================================
-  const getParticipantCount = (deal) => {
-    return Number(
-      deal.current_participants ?? 0
-    );
-  };
-
-  // ==========================================
-  // DASHBOARD STATISTICS
-  // ==========================================
-  const totalDeals = deals.length;
-
-  const activeDeals = deals.filter(
-    (deal) => deal.status === "ACTIVE"
-  ).length;
-
-  const successfulDeals = deals.filter(
-    (deal) => deal.status === "SUCCESSFUL"
-  ).length;
-
-  const totalParticipants = deals.reduce(
-    (total, deal) => {
-      return (
-        total +
-        getParticipantCount(deal)
-      );
-    },
-    0
-  );
-
-  const stats = [
-    {
-      title: "Total Deals",
-      value: totalDeals,
-      icon: "📦",
-    },
-    {
-      title: "Active Deals",
-      value: activeDeals,
-      icon: "🔥",
-    },
-    {
-      title: "Participants",
-      value: totalParticipants,
-      icon: "👥",
-    },
-    {
-      title: "Successful Deals",
-      value: successfulDeals,
-      icon: "✅",
-    },
+  const cards = [
+    { label: "Total Deals", value: sellerStats.total, icon: Package },
+    { label: "Active Deals", value: sellerStats.active, icon: Clock3 },
+    { label: "Successful Deals", value: sellerStats.successful, icon: CheckCircle2 },
+    { label: "Total Participants", value: sellerStats.participants, icon: Users }
   ];
 
-  // Backend returns newest deals first
-  const recentDeals = deals.slice(0, 3);
-
   return (
-    <main className="seller-dashboard">
-      <div className="container">
+    <SellerLayout title="Dashboard Overview">
+      <section className="sd-welcome">
+        <div>
+          <small>SELLER WORKSPACE</small>
+          <h2>Welcome back, Demo Seller!</h2>
+          <p>Manage your group deals and track marketplace activity.</p>
+        </div>
+        <Link className="sd-primary" to="/seller/create-deal">
+          <Plus size={18} /> Create New Deal
+        </Link>
+      </section>
 
-        {/* HEADER */}
-        <div className="seller-dashboard-header">
+      <section className="sd-stats">
+        {cards.map(card => {
+          const Icon = card.icon;
+          return (
+            <article className="sd-stat" key={card.label}>
+              <div className="sd-stat-icon">
+                <Icon size={22} />
+              </div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="sd-panel">
+        <div className="sd-panel-heading">
           <div>
-            <span className="seller-label">
-              Seller Center
-            </span>
-
-            <h1>Seller Dashboard</h1>
-
-            <p>
-              Manage your group deals and track
-              customer participation.
-            </p>
+            <h2>Recent Deals</h2>
+            <p>Track your recently created group deals.</p>
           </div>
-
-          <Link
-            to="/seller/create-deal"
-            className="create-deal-button"
-          >
-            + Create Deal
+          <Link to="/seller/deals">
+            View All Deals <ArrowRight size={16} />
           </Link>
         </div>
 
-        {/* ERROR */}
-        {error && (
-          <div className="seller-dashboard-error">
-            {error}
-          </div>
-        )}
+        <div className="sd-toolbar">
+          <label className="sd-search">
+            <Search size={17} />
+            <input
+              type="search"
+              placeholder="Search deals..."
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+            />
+          </label>
 
-        {/* STATISTICS */}
-        <div className="seller-stats-grid">
-          {stats.map((stat) => (
-            <div
-              className="seller-stat-card"
-              key={stat.title}
-            >
-              <div className="seller-stat-icon">
-                {stat.icon}
-              </div>
-
-              <div>
-                <p>{stat.title}</p>
-
-                <h2>
-                  {loading
-                    ? "..."
-                    : stat.value}
-                </h2>
-              </div>
-            </div>
-          ))}
+          <select
+            value={status}
+            onChange={event => setStatus(event.target.value)}
+            aria-label="Filter deal status"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="successful">Successful</option>
+            <option value="failed">Failed</option>
+          </select>
         </div>
 
-        {/* QUICK ACTIONS */}
-        <section className="seller-actions-section">
-          <h2>Quick Actions</h2>
+        <div className="sd-table-wrap">
+          <table className="sd-table">
+            <thead>
+              <tr>
+                <th>Deal Name</th>
+                <th>Group Price</th>
+                <th>Participants</th>
+                <th>Status</th>
+                <th>End Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(deal => (
+                <tr key={deal.id}>
+                  <td>
+                    <strong>{deal.name}</strong>
+                    <small>{deal.category}</small>
+                  </td>
+                  <td className="sd-price">
+                    {formatPrice(deal.groupPrice)}
+                  </td>
+                  <td>
+                    <span>{deal.participants}/{deal.required}</span>
+                    <div className="sd-progress">
+                      <span
+                        style={{
+                          width: `${Math.min(
+                            deal.participants / deal.required * 100,
+                            100
+                          )}%`
+                        }}
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`sd-status ${deal.status}`}>
+                      {deal.status}
+                    </span>
+                  </td>
+                  <td>{deal.endDate}</td>
+                </tr>
+              ))}
 
-          <div className="seller-actions-grid">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="sd-empty">
+                    No matching deals found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="sd-table-footer">
+          Showing {filtered.length} of {sellerDeals.length} demo deals
+        </div>
+      </section>
 
-            <Link
-              to="/seller/create-deal"
-              className="seller-action-card"
-            >
-              <span>➕</span>
-
-              <div>
-                <h3>Create Deal</h3>
-
-                <p>
-                  Create a new group buying offer.
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/seller/deals"
-              className="seller-action-card"
-            >
-              <span>📋</span>
-
-              <div>
-                <h3>My Deals</h3>
-
-                <p>
-                  View and manage your existing
-                  deals.
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/seller/import-csv"
-              className="seller-action-card"
-            >
-              <span>📄</span>
-
-              <div>
-                <h3>Import CSV</h3>
-
-                <p>
-                  Create multiple deals using a
-                  CSV file.
-                </p>
-              </div>
-            </Link>
-
-            <Link
-              to="/seller/reports"
-              className="seller-action-card"
-            >
-              <span>📊</span>
-
-              <div>
-                <h3>Reports</h3>
-
-                <p>
-                  View deal outcomes and
-                  participation.
-                </p>
-              </div>
-            </Link>
-
-          </div>
-        </section>
-
-        {/* RECENT DEALS */}
-        <section className="recent-deals-section">
-
-          <div className="recent-deals-heading">
-            <h2>Recent Deals</h2>
-
-            <Link to="/seller/deals">
-              View All →
-            </Link>
-          </div>
-
-          {loading ? (
-            <p>Loading recent deals...</p>
-          ) : recentDeals.length === 0 ? (
-            <p>No deals created yet.</p>
-          ) : (
-            <div className="seller-table-wrapper">
-
-              <table className="seller-table">
-
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Group Price</th>
-                    <th>Buyers</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {recentDeals.map((deal) => {
-
-                    const groupPrice =
-                      Number(
-                        deal.group_price ?? 0
-                      );
-
-                    const minimumBuyers =
-                      Number(
-                        deal.minimum_buyers ?? 0
-                      );
-
-                    const buyers =
-                      getParticipantCount(deal);
-
-                    const status =
-                      deal.status || "ACTIVE";
-
-                    return (
-                      <tr key={deal.id}>
-
-                        <td>
-                          {deal.product_name}
-                        </td>
-
-                        <td>
-                          Rs.{" "}
-                          {groupPrice.toLocaleString()}
-                        </td>
-
-                        <td>
-                          {buyers} /{" "}
-                          {minimumBuyers}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`seller-status ${status.toLowerCase()}`}
-                          >
-                            {status}
-                          </span>
-                        </td>
-
-                      </tr>
-                    );
-                  })}
-                </tbody>
-
-              </table>
-            </div>
-          )}
-
-        </section>
-      </div>
-    </main>
+      <section className="sd-quick">
+        <h2>Quick Actions</h2>
+        <div className="sd-quick-grid">
+          {[
+            {
+              title: "Create Deal",
+              detail: "Add a new group buying offer.",
+              icon: Plus,
+              path: "/seller/create-deal"
+            },
+            {
+              title: "Import CSV",
+              detail: "Upload multiple deals.",
+              icon: FileSpreadsheet,
+              path: "/seller/import"
+            },
+            {
+              title: "View Reports",
+              detail: "Explore deal performance.",
+              icon: TrendingUp,
+              path: "/seller/reports"
+            }
+          ].map(item => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.path} to={item.path}>
+                <Icon size={24} />
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+                <ArrowRight size={17} />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </SellerLayout>
   );
 }
-
-export default SellerDashboard;
