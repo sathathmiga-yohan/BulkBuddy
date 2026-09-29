@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   ArrowRight,
@@ -19,6 +19,8 @@ import {
 import "./Register.css";
 
 export default function Register() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     role: "customer",
     fullName: "",
@@ -28,9 +30,7 @@ export default function Register() {
     acceptTerms: false
   });
 
-  const [showPassword, setShowPassword] =
-    useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
@@ -45,7 +45,8 @@ export default function Register() {
 
     setErrors((current) => ({
       ...current,
-      [name]: ""
+      [name]: "",
+      general: ""
     }));
 
     setSuccess(false);
@@ -61,7 +62,7 @@ export default function Register() {
     if (!form.email.trim()) {
       newErrors.email = "Please enter your email.";
     } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
     ) {
       newErrors.email = "Enter a valid email address.";
     }
@@ -95,7 +96,6 @@ export default function Register() {
     event.preventDefault();
 
     const validationErrors = validateForm();
-
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
@@ -103,7 +103,46 @@ export default function Register() {
       return;
     }
 
-    setSuccess(true);
+    // FRONTEND DEMO:
+    // Save only non-sensitive profile information.
+    // Real registration will use the FastAPI backend.
+    const demoUser = {
+      fullName: form.fullName.trim(),
+      email: form.email.trim().toLowerCase(),
+      role: form.role
+    };
+
+    try {
+      sessionStorage.setItem(
+        "bulkbuddy_demo_user",
+        JSON.stringify(demoUser)
+      );
+
+      setSuccess(true);
+
+      // Navigate according to the selected account type.
+      if (form.role === "seller") {
+        navigate("/seller/dashboard", {
+          replace: true
+        });
+      } else {
+        navigate("/customer/dashboard", {
+          replace: true
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Demo registration failed:",
+        error
+      );
+
+      setSuccess(false);
+
+      setErrors({
+        general:
+          "Unable to continue. Please try again."
+      });
+    }
   };
 
   return (
@@ -150,11 +189,18 @@ export default function Register() {
                   </strong>
 
                   <p>
-                    Your {form.role} form passed
-                    validation. No real account
-                    has been created yet.
+                    Redirecting to your dashboard...
                   </p>
                 </div>
+              </div>
+            )}
+
+            {errors.general && (
+              <div
+                className="register-error"
+                role="alert"
+              >
+                {errors.general}
               </div>
             )}
 
@@ -426,7 +472,7 @@ export default function Register() {
                 )}
               </div>
 
-              {/* TERMS */}
+              {/* TERMS AND CONDITIONS */}
 
               <div className="register-terms">
                 <label>
@@ -442,7 +488,7 @@ export default function Register() {
                   />
 
                   <span>
-                    I agree to the Terms & Conditions
+                    I agree to the Terms &amp; Conditions
                     and Privacy Policy.
                   </span>
                 </label>
@@ -454,7 +500,7 @@ export default function Register() {
                 )}
               </div>
 
-              {/* SUBMIT */}
+              {/* CREATE ACCOUNT BUTTON */}
 
               <button
                 type="submit"
@@ -468,6 +514,7 @@ export default function Register() {
 
             <p className="register-login-text">
               Already have an account?{" "}
+
               <Link to="/login">
                 Login
               </Link>
@@ -479,6 +526,7 @@ export default function Register() {
         {/* RIGHT: SHOPPING IMAGE */}
 
         <aside className="register-visual-side">
+
           <img
             src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&q=90"
             alt="Shopping fashion collection"
@@ -498,6 +546,7 @@ export default function Register() {
             </div>
 
             <div className="register-visual-bottom">
+
               <span className="register-visual-pill">
                 <Sparkles size={16} />
                 SHOP SMARTER TOGETHER
@@ -517,6 +566,7 @@ export default function Register() {
               </p>
 
               <div className="register-visual-benefits">
+
                 <span>
                   <CheckCircle2 size={17} />
                   Exclusive Group Discounts
@@ -531,9 +581,9 @@ export default function Register() {
                   <CheckCircle2 size={17} />
                   Better Shopping Together
                 </span>
+
               </div>
             </div>
-
           </div>
         </aside>
 

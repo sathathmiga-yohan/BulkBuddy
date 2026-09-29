@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -13,28 +13,56 @@ import {
   ArrowRight,
   X,
   RotateCcw,
-  ChevronDown
+  ChevronDown,
 } from "lucide-react";
 
 import {
   mockDeals,
   dealCategories,
-  formatPrice
+  formatPrice,
 } from "../../data/mockDeals.js";
 
 import "./Deals.css";
+
+const STORAGE_KEY =
+  "bulkbuddy_seller_created_deals_v1";
+
+function loadCustomerDeals() {
+  try {
+    const created = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) || "[]"
+    );
+
+    const activeDeals = Array.isArray(created)
+      ? created.filter(
+          (deal) => deal.status === "active"
+        )
+      : [];
+
+    return [...activeDeals, ...mockDeals];
+  } catch (error) {
+    console.error("Unable to load deals:", error);
+    return mockDeals;
+  }
+}
 
 const priceOptions = [
   { label: "All Prices", value: "all" },
   { label: "Under Rs. 5,000", value: "5000" },
   { label: "Under Rs. 10,000", value: "10000" },
   { label: "Under Rs. 20,000", value: "20000" },
-  { label: "Under Rs. 50,000", value: "50000" }
+  { label: "Under Rs. 50,000", value: "50000" },
 ];
 
-function DealCard({ deal, isFavourite, onFavourite }) {
+function DealCard({
+  deal,
+  isFavourite,
+  onFavourite,
+}) {
   const progress = Math.min(
-    Math.round((deal.joined / deal.required) * 100),
+    Math.round(
+      (deal.joined / deal.required) * 100
+    ),
     100
   );
 
@@ -56,7 +84,9 @@ function DealCard({ deal, isFavourite, onFavourite }) {
           className={`deals-heart ${
             isFavourite ? "selected" : ""
           }`}
-          onClick={() => onFavourite(deal.id)}
+          onClick={() =>
+            onFavourite(deal.id)
+          }
           aria-label={
             isFavourite
               ? `Remove ${deal.name} from favourites`
@@ -66,7 +96,11 @@ function DealCard({ deal, isFavourite, onFavourite }) {
         >
           <Heart
             size={18}
-            fill={isFavourite ? "currentColor" : "none"}
+            fill={
+              isFavourite
+                ? "currentColor"
+                : "none"
+            }
           />
         </button>
       </div>
@@ -76,7 +110,10 @@ function DealCard({ deal, isFavourite, onFavourite }) {
           <span>{deal.category}</span>
 
           <span className="deals-rating">
-            <Star size={13} fill="currentColor" />
+            <Star
+              size={13}
+              fill="currentColor"
+            />
             {deal.rating}
           </span>
         </div>
@@ -94,22 +131,29 @@ function DealCard({ deal, isFavourite, onFavourite }) {
             </span>
 
             <strong>
-              {formatPrice(deal.groupPrice)}
+              {formatPrice(
+                deal.groupPrice
+              )}
             </strong>
           </div>
 
           <del>
-            {formatPrice(deal.originalPrice)}
+            {formatPrice(
+              deal.originalPrice
+            )}
           </del>
         </div>
 
         <div className="deals-progress-header">
           <span>
             <Users size={14} />
-            {deal.joined} / {deal.required} buyers
+            {deal.joined} /{" "}
+            {deal.required} buyers
           </span>
 
-          <strong>{progress}%</strong>
+          <strong>
+            {progress}%
+          </strong>
         </div>
 
         <div
@@ -118,9 +162,15 @@ function DealCard({ deal, isFavourite, onFavourite }) {
           aria-label={`${deal.name} group buying progress`}
           aria-valuenow={deal.joined}
           aria-valuemin={0}
-          aria-valuemax={deal.required}
+          aria-valuemax={
+            deal.required
+          }
         >
-          <span style={{ width: `${progress}%` }} />
+          <span
+            style={{
+              width: `${progress}%`,
+            }}
+          />
         </div>
 
         <div className="deals-card-footer">
@@ -143,102 +193,229 @@ function DealCard({ deal, isFavourite, onFavourite }) {
 }
 
 export default function Deals() {
-  const [searchParams, setSearchParams] =
-    useSearchParams();
+  const [
+    sharedDeals,
+    setSharedDeals,
+  ] = useState(loadCustomerDeals);
 
-  const search = searchParams.get("search") || "";
-
-  const [category, setCategory] =
-    useState("All Categories");
-
-  const [maxPrice, setMaxPrice] = useState("all");
-  const [sortBy, setSortBy] = useState("featured");
-  const [view, setView] = useState("grid");
-  const [favourites, setFavourites] = useState([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const filteredDeals = useMemo(() => {
-    let results = mockDeals.filter((deal) => {
-      const searchText = search.trim().toLowerCase();
-
-      const matchesSearch =
-        !searchText ||
-        deal.name.toLowerCase().includes(searchText) ||
-        deal.category.toLowerCase().includes(searchText) ||
-        deal.seller.toLowerCase().includes(searchText);
-
-      const matchesCategory =
-        category === "All Categories" ||
-        deal.category === category;
-
-      const matchesPrice =
-        maxPrice === "all" ||
-        deal.groupPrice <= Number(maxPrice);
-
-      return (
-        matchesSearch &&
-        matchesCategory &&
-        matchesPrice
+  useEffect(() => {
+    const refresh = () => {
+      setSharedDeals(
+        loadCustomerDeals()
       );
-    });
+    };
 
-    switch (sortBy) {
-      case "price-low":
-        results.sort(
-          (a, b) => a.groupPrice - b.groupPrice
+    window.addEventListener(
+      "bulkbuddy-deals-updated",
+      refresh
+    );
+
+    window.addEventListener(
+      "storage",
+      refresh
+    );
+
+    return () => {
+      window.removeEventListener(
+        "bulkbuddy-deals-updated",
+        refresh
+      );
+
+      window.removeEventListener(
+        "storage",
+        refresh
+      );
+    };
+  }, []);
+
+  const [
+    searchParams,
+    setSearchParams,
+  ] = useSearchParams();
+
+  const search =
+    searchParams.get("search") || "";
+
+  const [
+    category,
+    setCategory,
+  ] = useState("All Categories");
+
+  const [
+    maxPrice,
+    setMaxPrice,
+  ] = useState("all");
+
+  const [
+    sortBy,
+    setSortBy,
+  ] = useState("featured");
+
+  const [
+    view,
+    setView,
+  ] = useState("grid");
+
+  const [
+    favourites,
+    setFavourites,
+  ] = useState([]);
+
+  const [
+    filtersOpen,
+    setFiltersOpen,
+  ] = useState(false);
+
+  const filteredDeals = useMemo(
+    () => {
+      let results =
+        sharedDeals.filter(
+          (deal) => {
+            const searchText =
+              search
+                .trim()
+                .toLowerCase();
+
+            const matchesSearch =
+              !searchText ||
+              deal.name
+                .toLowerCase()
+                .includes(
+                  searchText
+                ) ||
+              deal.category
+                .toLowerCase()
+                .includes(
+                  searchText
+                ) ||
+              deal.seller
+                .toLowerCase()
+                .includes(
+                  searchText
+                );
+
+            const matchesCategory =
+              category ===
+                "All Categories" ||
+              deal.category ===
+                category;
+
+            const matchesPrice =
+              maxPrice ===
+                "all" ||
+              deal.groupPrice <=
+                Number(
+                  maxPrice
+                );
+
+            return (
+              matchesSearch &&
+              matchesCategory &&
+              matchesPrice
+            );
+          }
         );
-        break;
 
-      case "price-high":
-        results.sort(
-          (a, b) => b.groupPrice - a.groupPrice
-        );
-        break;
+      switch (sortBy) {
+        case "price-low":
+          results.sort(
+            (a, b) =>
+              a.groupPrice -
+              b.groupPrice
+          );
+          break;
 
-      case "discount":
-        results.sort(
-          (a, b) => b.discount - a.discount
-        );
-        break;
+        case "price-high":
+          results.sort(
+            (a, b) =>
+              b.groupPrice -
+              a.groupPrice
+          );
+          break;
 
-      case "ending":
-        results.sort(
-          (a, b) => a.daysLeft - b.daysLeft
-        );
-        break;
+        case "discount":
+          results.sort(
+            (a, b) =>
+              b.discount -
+              a.discount
+          );
+          break;
 
-      case "popular":
-        results.sort(
-          (a, b) => b.joined - a.joined
-        );
-        break;
+        case "ending":
+          results.sort(
+            (a, b) =>
+              a.daysLeft -
+              b.daysLeft
+          );
+          break;
 
-      default:
-        break;
-    }
+        case "popular":
+          results.sort(
+            (a, b) =>
+              b.joined -
+              a.joined
+          );
+          break;
 
-    return results;
-  }, [search, category, maxPrice, sortBy]);
+        default:
+          break;
+      }
 
-  const toggleFavourite = (id) => {
-    setFavourites((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
+      return results;
+    },
+    [
+      sharedDeals,
+      search,
+      category,
+      maxPrice,
+      sortBy,
+    ]
+  );
+
+  const toggleFavourite = (
+    id
+  ) => {
+    setFavourites(
+      (current) =>
+        current.includes(
+          id
+        )
+          ? current.filter(
+              (item) =>
+                item !== id
+            )
+          : [
+              ...current,
+              id,
+            ]
     );
   };
 
   const clearFilters = () => {
-    setCategory("All Categories");
-    setMaxPrice("all");
-    setSortBy("featured");
-    setSearchParams({});
+    setCategory(
+      "All Categories"
+    );
+
+    setMaxPrice(
+      "all"
+    );
+
+    setSortBy(
+      "featured"
+    );
+
+    setSearchParams(
+      {}
+    );
   };
 
   const hasFilters =
-    search.trim() !== "" ||
-    category !== "All Categories" ||
-    maxPrice !== "all";
+    search.trim() !==
+      "" ||
+    category !==
+      "All Categories" ||
+    maxPrice !==
+      "all";
 
   return (
     <main className="deals-page">
@@ -249,35 +426,58 @@ export default function Deals() {
           </span>
 
           <h1>
-            Discover Amazing <span>Group Deals</span>
+            Discover Amazing{" "}
+            <span>
+              Group Deals
+            </span>
           </h1>
 
           <p>
-            Find your favourite products, join other
-            shoppers and unlock better prices together.
+            Find your favourite
+            products, join other
+            shoppers and unlock
+            better prices together.
           </p>
         </div>
       </section>
 
       <div className="deals-container deals-main">
         <div className="deals-breadcrumb">
-          <Link to="/">Home</Link>
-          <span>/</span>
-          <strong>Explore Deals</strong>
+          <Link to="/">
+            Home
+          </Link>
+
+          <span>
+            /
+          </span>
+
+          <strong>
+            Explore Deals
+          </strong>
         </div>
 
         <div className="deals-mobile-filter-row">
           <button
             type="button"
-            onClick={() => setFiltersOpen(!filtersOpen)}
+            onClick={() =>
+              setFiltersOpen(
+                !filtersOpen
+              )
+            }
           >
             {filtersOpen ? (
-              <X size={17} />
+              <X
+                size={17}
+              />
             ) : (
-              <SlidersHorizontal size={17} />
+              <SlidersHorizontal
+                size={17}
+              />
             )}
 
-            {filtersOpen ? "Close Filters" : "Filters"}
+            {filtersOpen
+              ? "Close Filters"
+              : "Filters"}
           </button>
         </div>
 
@@ -286,82 +486,132 @@ export default function Deals() {
 
           <aside
             className={`deals-sidebar ${
-              filtersOpen ? "open" : ""
+              filtersOpen
+                ? "open"
+                : ""
             }`}
           >
             <div className="deals-sidebar-heading">
               <h2>
-                <SlidersHorizontal size={18} />
+                <SlidersHorizontal
+                  size={18}
+                />
                 Filters
               </h2>
 
               <button
                 type="button"
-                onClick={clearFilters}
+                onClick={
+                  clearFilters
+                }
                 className="deals-reset"
               >
-                <RotateCcw size={14} />
+                <RotateCcw
+                  size={14}
+                />
                 Reset
               </button>
             </div>
 
             <div className="deals-filter-section">
-              <h3>Categories</h3>
+              <h3>
+                Categories
+              </h3>
 
               <div className="deals-category-options">
-                {dealCategories.map((item) => (
-                  <label key={item}>
-                    <input
-                      type="radio"
-                      name="category"
-                      checked={category === item}
-                      onChange={() => setCategory(item)}
-                    />
+                {dealCategories.map(
+                  (item) => (
+                    <label
+                      key={
+                        item
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="category"
+                        checked={
+                          category ===
+                          item
+                        }
+                        onChange={() =>
+                          setCategory(
+                            item
+                          )
+                        }
+                      />
 
-                    <span>{item}</span>
-                  </label>
-                ))}
+                      <span>
+                        {item}
+                      </span>
+                    </label>
+                  )
+                )}
               </div>
             </div>
 
             <div className="deals-filter-section">
-              <h3>Price Range</h3>
+              <h3>
+                Price Range
+              </h3>
 
               <div className="deals-price-options">
-                {priceOptions.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      type="radio"
-                      name="price"
-                      checked={
-                        maxPrice === option.value
+                {priceOptions.map(
+                  (
+                    option
+                  ) => (
+                    <label
+                      key={
+                        option.value
                       }
-                      onChange={() =>
-                        setMaxPrice(option.value)
-                      }
-                    />
+                    >
+                      <input
+                        type="radio"
+                        name="price"
+                        checked={
+                          maxPrice ===
+                          option.value
+                        }
+                        onChange={() =>
+                          setMaxPrice(
+                            option.value
+                          )
+                        }
+                      />
 
-                    <span>{option.label}</span>
-                  </label>
-                ))}
+                      <span>
+                        {
+                          option.label
+                        }
+                      </span>
+                    </label>
+                  )
+                )}
               </div>
             </div>
 
             <div className="deals-sidebar-promo">
               <div className="deals-promo-icon">
-                <Users size={23} />
+                <Users
+                  size={23}
+                />
               </div>
 
-              <h3>Buy More, Save More!</h3>
+              <h3>
+                Buy More, Save More!
+              </h3>
 
               <p>
-                Join group deals and enjoy
-                exclusive community savings.
+                Join group deals
+                and enjoy
+                exclusive community
+                savings.
               </p>
 
               <Link to="/how-it-works">
                 How It Works
-                <ArrowRight size={15} />
+                <ArrowRight
+                  size={15}
+                />
               </Link>
             </div>
           </aside>
@@ -371,22 +621,41 @@ export default function Deals() {
           <section className="deals-results">
             <div className="deals-toolbar">
               <div className="deals-result-count">
-                <h2>All Group Deals</h2>
+                <h2>
+                  All Group Deals
+                </h2>
 
                 <p>
-                  Showing {filteredDeals.length} of{" "}
-                  {mockDeals.length} products
+                  Showing{" "}
+                  {
+                    filteredDeals.length
+                  }{" "}
+                  of{" "}
+                  {
+                    sharedDeals.length
+                  }{" "}
+                  products
                 </p>
               </div>
 
               <div className="deals-toolbar-actions">
                 <label className="deals-sort">
-                  <span>Sort by:</span>
+                  <span>
+                    Sort by:
+                  </span>
 
                   <select
-                    value={sortBy}
-                    onChange={(event) =>
-                      setSortBy(event.target.value)
+                    value={
+                      sortBy
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setSortBy(
+                        event
+                          .target
+                          .value
+                      )
                     }
                     aria-label="Sort deals"
                   >
@@ -399,15 +668,18 @@ export default function Deals() {
                     </option>
 
                     <option value="price-low">
-                      Price: Low to High
+                      Price: Low
+                      to High
                     </option>
 
                     <option value="price-high">
-                      Price: High to Low
+                      Price: High
+                      to Low
                     </option>
 
                     <option value="discount">
-                      Biggest Discount
+                      Biggest
+                      Discount
                     </option>
 
                     <option value="ending">
@@ -415,7 +687,9 @@ export default function Deals() {
                     </option>
                   </select>
 
-                  <ChevronDown size={14} />
+                  <ChevronDown
+                    size={14}
+                  />
                 </label>
 
                 <div
@@ -425,25 +699,49 @@ export default function Deals() {
                   <button
                     type="button"
                     className={
-                      view === "grid" ? "active" : ""
+                      view ===
+                      "grid"
+                        ? "active"
+                        : ""
                     }
-                    onClick={() => setView("grid")}
+                    onClick={() =>
+                      setView(
+                        "grid"
+                      )
+                    }
                     aria-label="Grid view"
-                    aria-pressed={view === "grid"}
+                    aria-pressed={
+                      view ===
+                      "grid"
+                    }
                   >
-                    <Grid2X2 size={17} />
+                    <Grid2X2
+                      size={17}
+                    />
                   </button>
 
                   <button
                     type="button"
                     className={
-                      view === "list" ? "active" : ""
+                      view ===
+                      "list"
+                        ? "active"
+                        : ""
                     }
-                    onClick={() => setView("list")}
+                    onClick={() =>
+                      setView(
+                        "list"
+                      )
+                    }
                     aria-label="List view"
-                    aria-pressed={view === "list"}
+                    aria-pressed={
+                      view ===
+                      "list"
+                    }
                   >
-                    <List size={19} />
+                    <List
+                      size={19}
+                    />
                   </button>
                 </div>
               </div>
@@ -452,23 +750,42 @@ export default function Deals() {
             <form
               className="deals-page-search"
               role="search"
-              onSubmit={(event) =>
+              onSubmit={(
+                event
+              ) =>
                 event.preventDefault()
               }
             >
-              <Search size={19} />
+              <Search
+                size={19}
+              />
 
               <input
                 type="search"
                 placeholder="Search for products, brands or categories..."
                 aria-label="Search products"
-                value={search}
-                onChange={(event) => {
-                  const value = event.target.value;
+                value={
+                  search
+                }
+                onChange={(
+                  event
+                ) => {
+                  const value =
+                    event
+                      .target
+                      .value;
 
                   setSearchParams(
-                    value ? { search: value } : {},
-                    { replace: true }
+                    value
+                      ? {
+                          search:
+                            value,
+                        }
+                      : {},
+                    {
+                      replace:
+                        true,
+                    }
                   );
                 }}
               />
@@ -477,94 +794,147 @@ export default function Deals() {
                 <button
                   type="button"
                   aria-label="Clear search"
-                  onClick={() => setSearchParams({})}
+                  onClick={() =>
+                    setSearchParams(
+                      {}
+                    )
+                  }
                 >
-                  <X size={18} />
+                  <X
+                    size={18}
+                  />
                 </button>
               )}
             </form>
 
             {hasFilters && (
               <div className="deals-active-filters">
-                <span>Active filters</span>
+                <span>
+                  Active filters
+                </span>
 
                 {search && (
                   <button
                     type="button"
                     onClick={() =>
-                      setSearchParams({})
+                      setSearchParams(
+                        {}
+                      )
                     }
                   >
-                    Search: {search}
-                    <X size={13} />
+                    Search:{" "}
+                    {search}
+                    <X
+                      size={13}
+                    />
                   </button>
                 )}
 
-                {category !== "All Categories" && (
+                {category !==
+                  "All Categories" && (
                   <button
                     type="button"
                     onClick={() =>
-                      setCategory("All Categories")
+                      setCategory(
+                        "All Categories"
+                      )
                     }
                   >
-                    {category}
-                    <X size={13} />
+                    {
+                      category
+                    }
+                    <X
+                      size={13}
+                    />
                   </button>
                 )}
 
-                {maxPrice !== "all" && (
+                {maxPrice !==
+                  "all" && (
                   <button
                     type="button"
                     onClick={() =>
-                      setMaxPrice("all")
+                      setMaxPrice(
+                        "all"
+                      )
                     }
                   >
-                    Under {formatPrice(Number(maxPrice))}
-                    <X size={13} />
+                    Under{" "}
+                    {formatPrice(
+                      Number(
+                        maxPrice
+                      )
+                    )}
+                    <X
+                      size={13}
+                    />
                   </button>
                 )}
 
                 <button
                   type="button"
                   className="deals-clear-all"
-                  onClick={clearFilters}
+                  onClick={
+                    clearFilters
+                  }
                 >
                   Clear All
                 </button>
               </div>
             )}
 
-            {filteredDeals.length > 0 ? (
+            {filteredDeals.length >
+            0 ? (
               <div
                 className={`deals-products ${
-                  view === "list" ? "list-view" : ""
+                  view ===
+                  "list"
+                    ? "list-view"
+                    : ""
                 }`}
               >
-                {filteredDeals.map((deal) => (
-                  <DealCard
-                    key={deal.id}
-                    deal={deal}
-                    isFavourite={
-                      favourites.includes(deal.id)
-                    }
-                    onFavourite={toggleFavourite}
-                  />
-                ))}
+                {filteredDeals.map(
+                  (deal) => (
+                    <DealCard
+                      key={
+                        deal.id
+                      }
+                      deal={
+                        deal
+                      }
+                      isFavourite={favourites.includes(
+                        deal.id
+                      )}
+                      onFavourite={
+                        toggleFavourite
+                      }
+                    />
+                  )
+                )}
               </div>
             ) : (
               <div className="deals-empty">
-                <Search size={35} />
+                <Search
+                  size={35}
+                />
 
-                <h3>No matching deals found</h3>
+                <h3>
+                  No matching
+                  deals found
+                </h3>
 
                 <p>
-                  Try another search or change
-                  your filters.
+                  Try another
+                  search or
+                  change your
+                  filters.
                 </p>
 
                 <button
                   type="button"
-                  onClick={clearFilters}
+                  onClick={
+                    clearFilters
+                  }
                 >
                   Clear Filters
                 </button>

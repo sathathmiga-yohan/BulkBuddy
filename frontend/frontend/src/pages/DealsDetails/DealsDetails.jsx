@@ -14,28 +14,34 @@ import {
   ShoppingBag,
   Star,
   Truck,
-  Users
+  Users,
 } from "lucide-react";
 
 import {
   mockDeals,
-  formatPrice
+  formatPrice,
 } from "../../data/mockDeals.js";
 
 import "./DealsDetails.css";
 
-const getDeadline = (daysLeft) => {
+// Same key used in Createdeal.jsx and SellerDeals.jsx
+const STORAGE_KEY =
+  "bulkbuddy_seller_created_deals_v1";
+
+// Calculate the deadline for existing mock products.
+function getDeadline(daysLeft) {
   const deadline = new Date();
 
   deadline.setDate(
-    deadline.getDate() + daysLeft
+    deadline.getDate() + Number(daysLeft || 0)
   );
 
   deadline.setHours(23, 59, 59, 999);
 
   return deadline;
-};
+}
 
+// Countdown calculation
 function getTimeRemaining(deadline) {
   const difference = Math.max(
     deadline.getTime() - Date.now(),
@@ -46,18 +52,22 @@ function getTimeRemaining(deadline) {
     days: Math.floor(
       difference / (1000 * 60 * 60 * 24)
     ),
+
     hours: Math.floor(
       (difference / (1000 * 60 * 60)) % 24
     ),
+
     minutes: Math.floor(
       (difference / (1000 * 60)) % 60
     ),
+
     seconds: Math.floor(
       (difference / 1000) % 60
-    )
+    ),
   };
 }
 
+// Countdown component
 function Countdown({ deadline }) {
   const [remaining, setRemaining] = useState(
     () => getTimeRemaining(deadline)
@@ -74,10 +84,22 @@ function Countdown({ deadline }) {
   }, [deadline]);
 
   const units = [
-    { label: "Days", value: remaining.days },
-    { label: "Hours", value: remaining.hours },
-    { label: "Mins", value: remaining.minutes },
-    { label: "Secs", value: remaining.seconds }
+    {
+      label: "Days",
+      value: remaining.days,
+    },
+    {
+      label: "Hours",
+      value: remaining.hours,
+    },
+    {
+      label: "Mins",
+      value: remaining.minutes,
+    },
+    {
+      label: "Secs",
+      value: remaining.seconds,
+    },
   ];
 
   return (
@@ -98,12 +120,77 @@ function Countdown({ deadline }) {
   );
 }
 
+// Find both seller-created and original mock deals.
+function findDeal(id) {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) || "[]"
+    );
+
+    const createdDeals = Array.isArray(saved)
+      ? saved
+      : [];
+
+    const sellerDeal = createdDeals.find(
+      (deal) =>
+        String(deal.id) === String(id) &&
+        deal.status === "active"
+    );
+
+    if (sellerDeal) {
+      return sellerDeal;
+    }
+  } catch (error) {
+    console.error(
+      "Unable to load seller-created deal:",
+      error
+    );
+  }
+
+  return mockDeals.find(
+    (deal) => String(deal.id) === String(id)
+  );
+}
+
+// Main product details page
 export default function DealDetails() {
   const { id } = useParams();
 
-  const deal = mockDeals.find(
-    (item) => item.id === Number(id)
-  );
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => {
+      setRevision((current) => current + 1);
+    };
+
+    window.addEventListener(
+      "bulkbuddy-deals-updated",
+      refresh
+    );
+
+    window.addEventListener(
+      "storage",
+      refresh
+    );
+
+    return () => {
+      window.removeEventListener(
+        "bulkbuddy-deals-updated",
+        refresh
+      );
+
+      window.removeEventListener(
+        "storage",
+        refresh
+      );
+    };
+  }, []);
+
+  // Revision causes findDeal to run again
+  // after changes to browser storage.
+  void revision;
+
+  const deal = findDeal(id);
 
   if (!deal) {
     return (
@@ -124,14 +211,16 @@ export default function DealDetails() {
 
   return (
     <DealDetailsContent
-      key={deal.id}
+      key={`${deal.id}-${deal.name}-${deal.groupPrice}-${deal.endDate}`}
       deal={deal}
     />
   );
 }
 
+// Product information and customer interaction
 function DealDetailsContent({ deal }) {
   const [quantity, setQuantity] = useState(1);
+
   const [isFavourite, setIsFavourite] =
     useState(false);
 
@@ -147,31 +236,38 @@ function DealDetailsContent({ deal }) {
   const [demoJoined, setDemoJoined] =
     useState(false);
 
-  const [deadline] = useState(
-    () => getDeadline(deal.daysLeft)
+  const [deadline] = useState(() =>
+    deal.endDate
+      ? new Date(`${deal.endDate}T23:59:59`)
+      : getDeadline(deal.daysLeft)
   );
 
+  // Existing design displays three thumbnails.
   const images = [
     deal.image,
     deal.image,
-    deal.image
+    deal.image,
   ];
 
   const joinedCount =
-    deal.joined + (demoJoined ? quantity : 0);
+    Number(deal.joined || 0) +
+    (demoJoined ? quantity : 0);
 
   const availableQuantity = Math.max(
-    deal.maxQuantity - joinedCount,
+    Number(deal.maxQuantity || 0) - joinedCount,
     0
   );
 
   const progress = Math.min(
-    (joinedCount / deal.required) * 100,
+    (joinedCount / Number(deal.required || 1)) * 100,
     100
   );
 
   const handleJoin = () => {
-    if (demoJoined || availableQuantity < quantity) {
+    if (
+      demoJoined ||
+      availableQuantity < quantity
+    ) {
       return;
     }
 
@@ -190,9 +286,13 @@ function DealDetailsContent({ deal }) {
           aria-label="Breadcrumb"
         >
           <Link to="/">Home</Link>
+
           <span>/</span>
+
           <Link to="/deals">Deals</Link>
+
           <span>/</span>
+
           <strong>{deal.name}</strong>
         </nav>
 
@@ -228,13 +328,15 @@ function DealDetailsContent({ deal }) {
                   onClick={() =>
                     setSelectedImage(image)
                   }
-                  aria-label={
-                    `View product image ${index + 1}`
-                  }
+                  aria-label={`View product image ${
+                    index + 1
+                  }`}
                 >
                   <img
                     src={image}
-                    alt={`${deal.name} view ${index + 1}`}
+                    alt={`${deal.name} view ${
+                      index + 1
+                    }`}
                   />
                 </button>
               ))}
@@ -249,6 +351,8 @@ function DealDetailsContent({ deal }) {
 
           <div className="detail-information">
 
+            {/* CATEGORY AND RATING */}
+
             <div className="detail-category-row">
               <span className="detail-category">
                 {deal.category}
@@ -261,6 +365,7 @@ function DealDetailsContent({ deal }) {
                 />
 
                 {deal.rating}
+
                 <small>(Demo rating)</small>
               </span>
             </div>
@@ -269,7 +374,9 @@ function DealDetailsContent({ deal }) {
 
             <p className="detail-seller">
               Sold by{" "}
-              <strong>{deal.seller}</strong>
+              <strong>
+                {deal.seller}
+              </strong>
             </p>
 
             <p className="detail-description">
@@ -297,7 +404,7 @@ function DealDetailsContent({ deal }) {
                 Save{" "}
                 {formatPrice(
                   deal.originalPrice -
-                  deal.groupPrice
+                    deal.groupPrice
                 )}
               </span>
             </div>
@@ -318,20 +425,33 @@ function DealDetailsContent({ deal }) {
 
               <div className="detail-progress-numbers">
                 <div>
-                  <strong>{joinedCount}</strong>
-                  <span>Buyers Joined</span>
+                  <strong>
+                    {joinedCount}
+                  </strong>
+
+                  <span>
+                    Buyers Joined
+                  </span>
                 </div>
 
                 <div>
-                  <strong>{deal.required}</strong>
-                  <span>Minimum Buyers</span>
+                  <strong>
+                    {deal.required}
+                  </strong>
+
+                  <span>
+                    Minimum Buyers
+                  </span>
                 </div>
 
                 <div>
                   <strong>
                     {availableQuantity}
                   </strong>
-                  <span>Spots Left</span>
+
+                  <span>
+                    Spots Left
+                  </span>
                 </div>
               </div>
 
@@ -348,7 +468,7 @@ function DealDetailsContent({ deal }) {
               >
                 <div
                   style={{
-                    width: `${progress}%`
+                    width: `${progress}%`,
                   }}
                 />
               </div>
@@ -367,17 +487,25 @@ function DealDetailsContent({ deal }) {
             <div className="detail-deadline-box">
               <div className="detail-deadline-heading">
                 <Clock3 size={18} />
-                <strong>Deal Ends In</strong>
+
+                <strong>
+                  Deal Ends In
+                </strong>
               </div>
 
-              <Countdown deadline={deadline} />
+              <Countdown
+                deadline={deadline}
+              />
             </div>
 
             {/* QUANTITY */}
 
             <div className="detail-quantity-row">
               <div>
-                <strong>Quantity</strong>
+                <strong>
+                  Quantity
+                </strong>
+
                 <p>
                   Maximum {deal.maxQuantity} units
                   in this mock deal
@@ -393,14 +521,17 @@ function DealDetailsContent({ deal }) {
                     )
                   }
                   disabled={
-                    quantity <= 1 || demoJoined
+                    quantity <= 1 ||
+                    demoJoined
                   }
                   aria-label="Decrease quantity"
                 >
                   <Minus size={16} />
                 </button>
 
-                <span>{quantity}</span>
+                <span>
+                  {quantity}
+                </span>
 
                 <button
                   type="button"
@@ -452,10 +583,14 @@ function DealDetailsContent({ deal }) {
               <button
                 type="button"
                 className={`detail-wishlist-button ${
-                  isFavourite ? "active" : ""
+                  isFavourite
+                    ? "active"
+                    : ""
                 }`}
                 onClick={() =>
-                  setIsFavourite((current) => !current)
+                  setIsFavourite(
+                    (current) => !current
+                  )
                 }
                 aria-pressed={isFavourite}
               >
@@ -474,6 +609,8 @@ function DealDetailsContent({ deal }) {
               </button>
             </div>
 
+            {/* JOIN MESSAGE */}
+
             {showJoinMessage && (
               <div
                 className="detail-join-message"
@@ -490,7 +627,7 @@ function DealDetailsContent({ deal }) {
               </div>
             )}
 
-            {/* TRUST INFO */}
+            {/* TRUST INFORMATION */}
 
             <div className="detail-trust-row">
               <span>
@@ -503,11 +640,10 @@ function DealDetailsContent({ deal }) {
                 Delivery After Success
               </span>
             </div>
-
           </div>
         </section>
 
-        {/* DETAILS TABS */}
+        {/* PRODUCT INFORMATION TABS */}
 
         <section className="detail-tabs-section">
           <div
@@ -516,19 +652,34 @@ function DealDetailsContent({ deal }) {
             aria-label="Product information"
           >
             {[
-              ["description", "Description"],
-              ["specifications", "Specifications"],
-              ["reviews", "Reviews"]
+              [
+                "description",
+                "Description",
+              ],
+              [
+                "specifications",
+                "Specifications",
+              ],
+              [
+                "reviews",
+                "Reviews",
+              ],
             ].map(([value, label]) => (
               <button
                 key={value}
                 type="button"
                 role="tab"
-                aria-selected={activeTab === value}
-                className={
-                  activeTab === value ? "active" : ""
+                aria-selected={
+                  activeTab === value
                 }
-                onClick={() => setActiveTab(value)}
+                className={
+                  activeTab === value
+                    ? "active"
+                    : ""
+                }
+                onClick={() =>
+                  setActiveTab(value)
+                }
               >
                 {label}
               </button>
@@ -536,65 +687,107 @@ function DealDetailsContent({ deal }) {
           </div>
 
           <div className="detail-tab-content">
+
+            {/* DESCRIPTION TAB */}
+
             {activeTab === "description" && (
               <div>
-                <h2>Product Description</h2>
+                <h2>
+                  Product Description
+                </h2>
 
-                <p>{deal.description}</p>
+                <p>
+                  {deal.description}
+                </p>
 
                 <p>
                   Join this group deal with other
-                  BulkBuddy shoppers. When the minimum
-                  number of buyers is reached before
-                  the deadline, the deal can proceed
-                  at the group price.
+                  BulkBuddy shoppers. When the
+                  minimum number of buyers is
+                  reached before the deadline,
+                  the deal can proceed at the
+                  group price.
                 </p>
               </div>
             )}
 
+            {/* SPECIFICATIONS TAB */}
+
             {activeTab === "specifications" && (
               <div>
-                <h2>Product Specifications</h2>
+                <h2>
+                  Product Specifications
+                </h2>
 
                 <table className="detail-spec-table">
                   <tbody>
                     <tr>
-                      <th>Product</th>
-                      <td>{deal.name}</td>
+                      <th>
+                        Product
+                      </th>
+
+                      <td>
+                        {deal.name}
+                      </td>
                     </tr>
 
                     <tr>
-                      <th>Category</th>
-                      <td>{deal.category}</td>
+                      <th>
+                        Category
+                      </th>
+
+                      <td>
+                        {deal.category}
+                      </td>
                     </tr>
 
                     <tr>
-                      <th>Seller</th>
-                      <td>{deal.seller}</td>
+                      <th>
+                        Seller
+                      </th>
+
+                      <td>
+                        {deal.seller}
+                      </td>
                     </tr>
 
                     <tr>
-                      <th>Minimum Buyers</th>
-                      <td>{deal.required}</td>
+                      <th>
+                        Minimum Buyers
+                      </th>
+
+                      <td>
+                        {deal.required}
+                      </td>
                     </tr>
 
                     <tr>
-                      <th>Maximum Quantity</th>
-                      <td>{deal.maxQuantity}</td>
+                      <th>
+                        Maximum Quantity
+                      </th>
+
+                      <td>
+                        {deal.maxQuantity}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
 
                 <p className="detail-spec-note">
-                  Detailed technical specifications
-                  will be supplied by sellers.
+                  Detailed technical
+                  specifications will be
+                  supplied by sellers.
                 </p>
               </div>
             )}
 
+            {/* REVIEWS TAB */}
+
             {activeTab === "reviews" && (
               <div>
-                <h2>Customer Reviews</h2>
+                <h2>
+                  Customer Reviews
+                </h2>
 
                 <div className="detail-reviews-empty">
                   <Star size={30} />
@@ -609,7 +802,7 @@ function DealDetailsContent({ deal }) {
           </div>
         </section>
 
-        {/* BACK LINK */}
+        {/* BACK TO DEALS */}
 
         <Link
           to="/deals"
@@ -618,7 +811,6 @@ function DealDetailsContent({ deal }) {
           <ArrowLeft size={17} />
           Back to All Deals
         </Link>
-
       </div>
     </main>
   );
