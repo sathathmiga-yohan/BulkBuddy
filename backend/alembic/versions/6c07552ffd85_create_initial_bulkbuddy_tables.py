@@ -1,8 +1,8 @@
-"""create initial tables
+"""create initial bulkbuddy tables
 
-Revision ID: f947491cb50e
+Revision ID: 6c07552ffd85
 Revises: 
-Create Date: 2026-09-24 11:58:54.165248
+Create Date: 2026-09-29 09:59:17.166852
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f947491cb50e'
+revision: str = '6c07552ffd85'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,6 +29,7 @@ def upgrade() -> None:
     sa.Column('role', sa.Enum('CUSTOMER', 'SELLER', 'ADMIN', name='userrole'), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -44,7 +45,6 @@ def upgrade() -> None:
     sa.Column('maximum_quantity', sa.Integer(), nullable=False),
     sa.Column('deadline', sa.DateTime(timezone=True), nullable=False),
     sa.Column('status', sa.Enum('ACTIVE', 'SUCCESSFUL', 'FAILED', name='dealstatus'), nullable=False),
-    sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint('group_price < normal_price', name='check_group_price_less_than_normal'),
@@ -55,20 +55,62 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['seller_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_deals_deadline'), 'deals', ['deadline'], unique=False)
     op.create_index(op.f('ix_deals_id'), 'deals', ['id'], unique=False)
     op.create_index(op.f('ix_deals_seller_id'), 'deals', ['seller_id'], unique=False)
+    op.create_table('notifications',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=200), nullable=False),
+    sa.Column('message', sa.Text(), nullable=False),
+    sa.Column('is_read', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_notifications_id'), 'notifications', ['id'], unique=False)
+    op.create_index(op.f('ix_notifications_user_id'), 'notifications', ['user_id'], unique=False)
+    op.create_table('orders',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('deal_id', sa.Integer(), nullable=False),
+    sa.Column('customer_id', sa.Integer(), nullable=False),
+    sa.Column('quantity', sa.Integer(), nullable=False),
+    sa.Column('total_price', sa.Numeric(precision=10, scale=2), nullable=False),
+    sa.Column('delivery_name', sa.String(length=100), nullable=False),
+    sa.Column('delivery_phone', sa.String(length=30), nullable=False),
+    sa.Column('delivery_address', sa.String(length=500), nullable=False),
+    sa.Column('delivery_city', sa.String(length=100), nullable=False),
+    sa.Column('delivery_postal_code', sa.String(length=20), nullable=True),
+    sa.Column('status', sa.Enum('CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED', name='orderstatus'), nullable=False),
+    sa.Column('payment_status', sa.Enum('PENDING', 'PAID', name='paymentstatus'), nullable=False),
+    sa.Column('payment_method', sa.Enum('COD', name='paymentmethod'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint('quantity > 0', name='check_order_quantity_positive'),
+    sa.CheckConstraint('total_price > 0', name='check_order_total_price_positive'),
+    sa.ForeignKeyConstraint(['customer_id'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['deal_id'], ['deals.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('deal_id', 'customer_id', name='uq_order_deal_customer')
+    )
+    op.create_index(op.f('ix_orders_customer_id'), 'orders', ['customer_id'], unique=False)
+    op.create_index(op.f('ix_orders_deal_id'), 'orders', ['deal_id'], unique=False)
+    op.create_index(op.f('ix_orders_id'), 'orders', ['id'], unique=False)
     op.create_table('participations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('deal_id', sa.Integer(), nullable=False),
     sa.Column('customer_id', sa.Integer(), nullable=False),
-    sa.Column('status', sa.Enum('JOINED', 'CANCELLED', name='participationstatus'), nullable=False),
+    sa.Column('status', sa.Enum('JOINED', 'WAITING', 'CANCELLED', 'EXPIRED', name='participationstatus'), nullable=False),
+    sa.Column('delivery_name', sa.String(length=100), nullable=True),
+    sa.Column('delivery_phone', sa.String(length=30), nullable=True),
+    sa.Column('delivery_address', sa.String(length=500), nullable=True),
+    sa.Column('delivery_city', sa.String(length=100), nullable=True),
+    sa.Column('delivery_postal_code', sa.String(length=20), nullable=True),
     sa.Column('joined_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['customer_id'], ['users.id'], ),
     sa.ForeignKeyConstraint(['deal_id'], ['deals.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('deal_id', 'customer_id', name='uq_deal_customer')
+    sa.UniqueConstraint('deal_id', 'customer_id', name='uq_participation_deal_customer')
     )
     op.create_index(op.f('ix_participations_customer_id'), 'participations', ['customer_id'], unique=False)
     op.create_index(op.f('ix_participations_deal_id'), 'participations', ['deal_id'], unique=False)
@@ -83,9 +125,15 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_participations_deal_id'), table_name='participations')
     op.drop_index(op.f('ix_participations_customer_id'), table_name='participations')
     op.drop_table('participations')
+    op.drop_index(op.f('ix_orders_id'), table_name='orders')
+    op.drop_index(op.f('ix_orders_deal_id'), table_name='orders')
+    op.drop_index(op.f('ix_orders_customer_id'), table_name='orders')
+    op.drop_table('orders')
+    op.drop_index(op.f('ix_notifications_user_id'), table_name='notifications')
+    op.drop_index(op.f('ix_notifications_id'), table_name='notifications')
+    op.drop_table('notifications')
     op.drop_index(op.f('ix_deals_seller_id'), table_name='deals')
     op.drop_index(op.f('ix_deals_id'), table_name='deals')
-    op.drop_index(op.f('ix_deals_deadline'), table_name='deals')
     op.drop_table('deals')
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')

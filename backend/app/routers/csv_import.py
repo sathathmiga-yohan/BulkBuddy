@@ -1,7 +1,6 @@
+
 import csv
 import io
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
 
 from fastapi import (
     APIRouter,
@@ -11,19 +10,30 @@ from fastapi import (
     UploadFile,
     status,
 )
+
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth.security import require_seller
 from app.database import get_db
-from app.models.deal import Deal, DealStatus
+
+from app.models.deal import Deal
 from app.models.user import User
 
+from app.schemas.deal import DealCreate
+
+from app.services.deal_service import (
+    validate_deal_values,
+)
+
+# CSV IMPORT ROUTER
 
 router = APIRouter(
     prefix="/deals",
     tags=["CSV Import"]
 )
 
+# REQUIRED CSV HEADERS
 
 REQUIRED_COLUMNS = {
     "product_name",
@@ -35,67 +45,76 @@ REQUIRED_COLUMNS = {
     "deadline",
 }
 
+# IMPORT DEALS FROM CSV
 
-@router.post("/import-csv")
-async def import_deals_csv(
+@router.post(
+    "/import-csv",
+    status_code=status.HTTP_200_OK
+)
+async def import_deals_from_csv(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_seller),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller)
 ):
-  
-    # CHECK FILE TYPE
-  
-    if not file.filename:
+
+    # CHECK FILE EXTENSION
+
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV file is required"
+            detail="Please upload a valid CSV file"
         )
 
-    if not file.filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only CSV files are allowed"
-        )
-
-
-    # READ FILE
- 
-    content = await file.read()
-
-    if not content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV file is empty"
-        )
+    # READ AND DECODE FILE
 
     try:
-        text = content.decode("utf-8-sig")
+
+        file_content = await file.read()
+
+        decoded_content = file_content.decode(
+            "utf-8-sig"
+        )
+
     except UnicodeDecodeError:
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CSV file must use UTF-8 encoding"
         )
 
-    reader = csv.DictReader(
-        io.StringIO(text)
+    finally:
+
+        await file.close()
+
+    if not decoded_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV file is empty"
+        )
+
+    # PARSE CSV
+
+    csv_reader = csv.DictReader(
+        io.StringIO(decoded_content)
     )
 
-
-    # CHECK HEADERS
-
-    if reader.fieldnames is None:
+    if not csv_reader.fieldnames:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="CSV headers are missing"
         )
 
-    headers = {
+    # Remove accidental whitespace from header names.
+    csv_reader.fieldnames = [
         header.strip()
-        for header in reader.fieldnames
-        if header
-    }
+        for header in csv_reader.fieldnames
+    ]
 
-    missing_columns = REQUIRED_COLUMNS - headers
+    # CHECK REQUIRED COLUMNS
+
+    missing_columns = REQUIRED_COLUMNS - set(
+        csv_reader.fieldnames
+    )
 
     if missing_columns:
         raise HTTPException(
@@ -106,162 +125,130 @@ async def import_deals_csv(
             }
         )
 
-    new_deals = []
+    # PROCESS EACH CSV ROW
+
+    created_count = 0
     errors = []
 
-    now = datetime.now(timezone.utc)
-
-
-    # VALIDATE EACH ROW
-
     for row_number, row in enumerate(
-        reader,
+        csv_reader,
         start=2
     ):
+
+        # Ignore completely empty lines.
+        if not any(
+            str(value).strip()
+            for value in row.values()
+            if value is not None
+        ):
+            continue
+
         try:
-            product_name = (
-                row["product_name"] or ""
-            ).strip()
 
-            description = (
-                row["description"] or ""
-            ).strip() or None
-
-            if not product_name:
+            # Extra unnamed CSV values indicate a
+            # malformed row.
+            if None in row:
                 raise ValueError(
-                    "Product name is required"
+                    "Row contains more values than the CSV headers"
                 )
 
-            try:
-                normal_price = Decimal(
-                    row["normal_price"]
-                )
+            # Required values must not be missing.
+            missing_values = [
+                column
+                for column in REQUIRED_COLUMNS
+                if row.get(column) is None
+                or not str(row[column]).strip()
+                and column != "description"
+            ]
 
-                group_price = Decimal(
-                    row["group_price"]
-                )
-
-                minimum_buyers = int(
-                    row["minimum_buyers"]
-                )
-
-                maximum_quantity = int(
-                    row["maximum_quantity"]
-                )
-
-            except (
-                InvalidOperation,
-                ValueError,
-                TypeError
-            ):
+            if missing_values:
                 raise ValueError(
-                    "Invalid price or quantity value"
-                )
-            try:
-                deadline = datetime.fromisoformat(
-                    row["deadline"].strip()
-                )
-            except (ValueError, AttributeError):
-                raise ValueError(
-                    "Invalid deadline format. "
-                    "Use ISO format such as "
-                    "2026-09-24T20:00:00+05:30"
+                    "Missing required values: "
+                    + ", ".join(sorted(missing_values))
                 )
 
-            if deadline.tzinfo is None:
-                raise ValueError(
-                    "Deadline must include timezone"
-                )
+            # VALIDATE USING EXISTING DEAL SCHEMA
 
-            if normal_price <= 0:
-                raise ValueError(
-                    "Normal price must be greater than 0"
-                )
-
-            if group_price <= 0:
-                raise ValueError(
-                    "Group price must be greater than 0"
-                )
-
-            if group_price >= normal_price:
-                raise ValueError(
-                    "Group price must be less than normal price"
-                )
-
-            if minimum_buyers <= 0:
-                raise ValueError(
-                    "Minimum buyers must be greater than 0"
-                )
-
-            if maximum_quantity < minimum_buyers:
-                raise ValueError(
-                    "Maximum quantity must be greater than "
-                    "or equal to minimum buyers"
-                )
-
-            if deadline <= now:
-                raise ValueError(
-                    "Deadline must be in the future"
-                )
-
-            deal = Deal(
-                seller_id=current_user.id,
-                product_name=product_name,
-                description=description,
-                normal_price=normal_price,
-                group_price=group_price,
-                minimum_buyers=minimum_buyers,
-                maximum_quantity=maximum_quantity,
-                deadline=deadline,
-                status=DealStatus.ACTIVE,
-                is_active=True,
-            )
-
-            new_deals.append(deal)
-
-        except Exception as error:
-            errors.append({
-                "row": row_number,
-                "error": str(error),
+            deal_data = DealCreate.model_validate({
+                "product_name": row["product_name"],
+                "description": row.get("description") or None,
+                "normal_price": row["normal_price"],
+                "group_price": row["group_price"],
+                "minimum_buyers": row["minimum_buyers"],
+                "maximum_quantity": row["maximum_quantity"],
+                "deadline": row["deadline"],
             })
 
-    # NO VALID DATA
+            validate_deal_values(
+                normal_price=deal_data.normal_price,
+                group_price=deal_data.group_price,
+                minimum_buyers=deal_data.minimum_buyers,
+                maximum_quantity=deal_data.maximum_quantity,
+                deadline=deal_data.deadline
+            )
 
-    if not new_deals and not errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV contains no data rows"
-        )
+            # CREATE DEAL
 
-  
-    # VALIDATION ERRORS
+            new_deal = Deal(
+                seller_id=current_user.id,
+                product_name=deal_data.product_name,
+                description=deal_data.description,
+                normal_price=deal_data.normal_price,
+                group_price=deal_data.group_price,
+                minimum_buyers=deal_data.minimum_buyers,
+                maximum_quantity=deal_data.maximum_quantity,
+                deadline=deal_data.deadline,
+            )
 
-    # All-or-nothing import:
-    # if one row is invalid, nothing is inserted.
-    if errors:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "CSV validation failed",
-                "errors": errors,
-            }
-        )
+            # Save each row independently so that
+            # a failed row does not undo valid rows.
+            with db.begin_nested():
+                db.add(new_deal)
+                db.flush()
 
-    # SAVE ALL DEALS
-  
+            created_count += 1
+
+        except ValidationError as exc:
+
+            errors.append({
+                "row": row_number,
+                "errors": [
+                    {
+                        "field": ".".join(
+                            str(part)
+                            for part in error["loc"]
+                        ),
+                        "message": error["msg"],
+                    }
+                    for error in exc.errors()
+                ],
+            })
+
+        except (ValueError, TypeError) as exc:
+
+            errors.append({
+                "row": row_number,
+                "errors": [
+                    {
+                        "message": str(exc)
+                    }
+                ],
+            })
+
+    # COMMIT VALID ROWS
+
     try:
-        db.add_all(new_deals)
+
         db.commit()
 
     except Exception:
-        db.rollback()
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to import deals"
-        )
+        db.rollback()
+        raise
 
     return {
-        "message": "Deals imported successfully",
-        "imported_count": len(new_deals),
+        "message": "CSV import completed",
+        "created_count": created_count,
+        "failed_count": len(errors),
+        "errors": errors,
     }

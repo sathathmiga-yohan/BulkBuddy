@@ -1,32 +1,43 @@
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import require_seller
 from app.database import get_db
-from app.models.deal import Deal, DealStatus
+
+from app.models.deal import Deal
 from app.models.user import User
+
 from app.schemas.deal import (
     DealCreate,
     DealUpdate,
     DealResponse,
 )
+
 from app.services.deal_service import (
     build_deal_response,
-    get_participant_count,
-    normalize_datetime,
+    get_deal_or_404,
+    validate_seller_ownership,
+    validate_deal_values,
+    validate_deal_update,
+    validate_deal_deletion,
 )
 
+# DEALS ROUTER
 
 router = APIRouter(
     prefix="/deals",
     tags=["Deals"]
 )
 
-# GET ALL DEALS
-# PUBLIC MARKETPLACE
+# GET ALL DEALS - PUBLIC
 
 @router.get(
     "",
@@ -35,79 +46,66 @@ router = APIRouter(
 def get_all_deals(
     db: Session = Depends(get_db)
 ):
+
     deals = db.scalars(
-        select(Deal)
-        .where(
-            Deal.is_active == True
+        select(Deal).order_by(
+            Deal.created_at.desc(),
+            Deal.id.desc()
         )
-        .order_by(Deal.created_at.desc())
     ).all()
 
     return [
-        build_deal_response(
-            db,
-            deal
-        )
+        build_deal_response(db, deal)
         for deal in deals
     ]
 
-# SELLER - GET MY DEALS
+# GET SELLER'S OWN DEALS
 
 @router.get(
     "/seller/my-deals",
     response_model=list[DealResponse]
 )
 def get_my_deals(
-    current_user: User = Depends(require_seller),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller)
 ):
+
     deals = db.scalars(
-        select(Deal)
-        .where(
-            Deal.seller_id == current_user.id,
-            Deal.is_active == True
+        select(Deal).where(
+            Deal.seller_id == current_user.id
+        ).order_by(
+            Deal.created_at.desc(),
+            Deal.id.desc()
         )
-        .order_by(Deal.created_at.desc())
     ).all()
 
     return [
-        build_deal_response(
-            db,
-            deal
-        )
+        build_deal_response(db, deal)
         for deal in deals
     ]
 
-# GET ONE DEAL
-# PUBLIC
+# GET DEAL BY ID - PUBLIC
 
 @router.get(
     "/{deal_id}",
     response_model=DealResponse
 )
-def get_deal(
+def get_deal_by_id(
     deal_id: int,
     db: Session = Depends(get_db)
 ):
-    deal = db.get(
-        Deal,
+
+    deal = get_deal_or_404(
+        db,
         deal_id
     )
-
-    if deal is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deal not found"
-        )
 
     return build_deal_response(
         db,
         deal
     )
 
-
-
-# SELLER - CREATE DEAL
+# CREATE DEAL - SELLER ONLY
 
 @router.post(
     "",
@@ -116,17 +114,17 @@ def get_deal(
 )
 def create_deal(
     deal_data: DealCreate,
-    current_user: User = Depends(require_seller),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller)
 ):
-    now = datetime.now(timezone.utc)
 
-    # Deadline must be in the future
-    if deal_data.deadline <= now:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Deadline must be in the future"
-        )
+    validate_deal_values(
+        normal_price=deal_data.normal_price,
+        group_price=deal_data.group_price,
+        minimum_buyers=deal_data.minimum_buyers,
+        maximum_quantity=deal_data.maximum_quantity,
+        deadline=deal_data.deadline
+    )
 
     new_deal = Deal(
         seller_id=current_user.id,
@@ -136,9 +134,7 @@ def create_deal(
         group_price=deal_data.group_price,
         minimum_buyers=deal_data.minimum_buyers,
         maximum_quantity=deal_data.maximum_quantity,
-        deadline=deal_data.deadline,
-        status=DealStatus.ACTIVE,
-        is_active=True,
+        deadline=deal_data.deadline
     )
 
     db.add(new_deal)
@@ -150,7 +146,7 @@ def create_deal(
         new_deal
     )
 
-# SELLER - UPDATE OWN DEAL
+# UPDATE DEAL - OWNER ONLY
 
 @router.patch(
     "/{deal_id}",
@@ -158,126 +154,29 @@ def create_deal(
 )
 def update_deal(
     deal_id: int,
-    deal_data: DealUpdate,
-    current_user: User = Depends(require_seller),
-    db: Session = Depends(get_db)
+    update_data: DealUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller)
 ):
-    deal = db.get(
-        Deal,
+
+    deal = get_deal_or_404(
+        db,
         deal_id
     )
 
-    # Deal must exist
-    if deal is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deal not found"
-        )
-
-    # Seller can update only own deal
-    if deal.seller_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own deals"
-        )
-
-    now = datetime.now(timezone.utc)
-
-    # Cannot edit after deadline
-    if now >= normalize_datetime(deal.deadline):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Expired deal cannot be updated"
-        )
-
-    update_data = deal_data.model_dump(
-        exclude_unset=True
+    validate_seller_ownership(
+        deal,
+        current_user.id
     )
 
-    # FINAL VALUES AFTER UPDATE
-   
-
-    final_normal_price = update_data.get(
-        "normal_price",
-        deal.normal_price
-    )
-
-    final_group_price = update_data.get(
-        "group_price",
-        deal.group_price
-    )
-
-    final_minimum_buyers = update_data.get(
-        "minimum_buyers",
-        deal.minimum_buyers
-    )
-
-    final_maximum_quantity = update_data.get(
-        "maximum_quantity",
-        deal.maximum_quantity
-    )
-
-    final_deadline = update_data.get(
-        "deadline",
-        deal.deadline
-    )
-
-    # VALIDATION
-
-    # Group price must be cheaper
-    if final_group_price >= final_normal_price:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Group price must be less than "
-                "normal price"
-            )
-        )
-
-    # Maximum cannot be below minimum
-    if final_maximum_quantity < final_minimum_buyers:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Maximum quantity must be greater than "
-                "or equal to minimum buyers"
-            )
-        )
-
-    # Deadline must stay in future
-    if normalize_datetime(final_deadline) <= now:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Deadline must be in the future"
-        )
-
-    # CURRENT PARTICIPANT CHECK
-
-
-    current_participants = get_participant_count(
+    changes = validate_deal_update(
         db,
-        deal.id
+        deal,
+        update_data
     )
 
-    if final_maximum_quantity < current_participants:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Maximum quantity cannot be less than "
-                "the current participant count"
-            )
-        )
-
-
-    # SAVE UPDATE
- 
-
-    for field, value in update_data.items():
-        setattr(
-            deal,
-            field,
-            value
-        )
+    for field, value in changes.items():
+        setattr(deal, field, value)
 
     db.commit()
     db.refresh(deal)
@@ -287,44 +186,34 @@ def update_deal(
         deal
     )
 
+# DELETE DEAL - OWNER ONLY
 
-# ==========================================
-# SELLER - DELETE OWN DEAL
-# ==========================================
-# ==========================================
-# SELLER - DELETE OWN DEAL
-# ==========================================
 @router.delete(
-    "/{deal_id}"
+    "/{deal_id}",
+    status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_deal(
     deal_id: int,
-    current_user: User = Depends(require_seller),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller)
 ):
-    deal = db.get(
-        Deal,
+
+    deal = get_deal_or_404(
+        db,
         deal_id
     )
 
-    # Deal must exist
-    if deal is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deal not found"
-        )
+    validate_seller_ownership(
+        deal,
+        current_user.id
+    )
 
-    # Seller can delete only own deal
-    if deal.seller_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own deals"
-        )
+    validate_deal_deletion(
+        db,
+        deal
+    )
 
-    # Permanently delete from database
     db.delete(deal)
     db.commit()
 
-    return {
-        "message": "Deal deleted successfully"
-    }
+    return None
