@@ -602,3 +602,16 @@
     font-size: 22px;
   }
 }
+
+
+/* Waiting participants */
+.sdp-status.waiting {
+  background: #fff4db;
+  color: #a9750a;
+}
+
+/* Expired participants */
+.sdp-status.expired {
+  background: #f0ecf6;
+  color: #82788f;
+}

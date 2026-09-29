@@ -84,6 +84,7 @@ def build_participation_response(
     participation: Participation
 ) -> dict:
 
+
     return {
         "id": participation.id,
         "deal_id": participation.deal_id,
@@ -91,10 +92,10 @@ def build_participation_response(
         "status": participation.status,
 
         "delivery_name": participation.delivery_name,
-        "phone": participation.phone,
-        "address": participation.address,
-        "city": participation.city,
-        "postal_code": participation.postal_code,
+        "delivery_phone": participation.delivery_phone,
+        "delivery_address": participation.delivery_address,
+        "delivery_city": participation.delivery_city,
+        "delivery_postal_code": participation.delivery_postal_code,
 
         "joined_at": normalize_datetime(
             participation.joined_at
@@ -108,18 +109,22 @@ def build_participation_response(
             participation
         ),
     }
+  
+    }
 
 # CLEAR DELIVERY DETAILS
+
 
 def clear_delivery_details(
     participation: Participation
 ) -> None:
 
     participation.delivery_name = None
-    participation.phone = None
-    participation.address = None
-    participation.city = None
-    participation.postal_code = None
+    participation.delivery_phone = None
+    participation.delivery_address = None
+    participation.delivery_city = None
+    participation.delivery_postal_code = None
+  
 
 # GET FIRST WAITING CUSTOMER - FIFO
 
@@ -243,14 +248,25 @@ def join_deal(
 
         # SAVE FRESH DELIVERY DETAILS
 
-        participation.delivery_name = (
+                participation.delivery_name = (
             join_data.delivery_name
         )
 
-        participation.phone = join_data.phone
-        participation.address = join_data.address
-        participation.city = join_data.city
-        participation.postal_code = join_data.postal_code
+        participation.delivery_phone = (
+            join_data.delivery_phone
+        )
+
+        participation.delivery_address = (
+            join_data.delivery_address
+        )
+
+        participation.delivery_city = (
+            join_data.delivery_city
+        )
+
+        participation.delivery_postal_code = (
+            join_data.delivery_postal_code
+        )
 
         db.flush()
 

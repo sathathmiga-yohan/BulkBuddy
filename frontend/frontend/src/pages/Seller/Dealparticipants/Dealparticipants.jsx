@@ -1,7 +1,9 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+
 import {
+  AlertCircle,
   CheckCircle2,
   Clock3,
   Download,
@@ -10,112 +12,85 @@ import {
   ShoppingBag,
   Users,
   X,
-  XCircle
+  XCircle,
 } from "lucide-react";
 
 import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
-import { sellerDeals } from "../sellerMockData.js";
+
+import {
+  getSellerDeals,
+  getSellerDealParticipants,
+} from "../../../services/dealservice.js";
+
 import { formatPrice } from "../../../data/mockDeals.js";
 
 import "./Dealparticipants.css";
 
-const sampleNames = [
-  "Nimal Perera",
-  "Kavindi Silva",
-  "Arun Kumar",
-  "Fathima Rizna",
-  "Dinesh Fernando",
-  "Tharushi Jayasinghe",
-  "Mohamed Irfan",
-  "Shalini Raj",
-  "Kasun Bandara",
-  "Anusha Devi",
-  "Praveen Kumar",
-  "Dilani Fernando",
-  "Ramesh Siva",
-  "Ishara Perera",
-  "Sanjay Raj",
-  "Nethmi Silva",
-  "Rizwan Ahmed",
-  "Priya Kumar",
-  "Chamod Fernando",
-  "Ayesha Fathima",
-  "Kishan Perera",
-  "Madhavi Raj",
-  "Sahan Silva",
-  "Fathima Nisha",
-  "Dulani Jayasinghe",
-  "Vijay Kumar",
-  "Thilini Perera",
-  "Mohamed Safwan",
-  "Janani Devi",
-  "Roshan Fernando"
-];
+const statusLabels = {
+  ALL: "All Participants",
+  JOINED: "Joined",
+  WAITING: "Waiting",
+  CANCELLED: "Cancelled",
+  EXPIRED: "Expired",
+};
 
-function createDemoParticipants(deals) {
-  return deals.flatMap((deal) => {
-    const total = Number(deal.participants) || 0;
+function getErrorMessage(error) {
+  const detail = error?.response?.data?.detail;
 
-    return Array.from(
-      { length: total },
-      (_, index) => {
-        const name =
-          sampleNames[index % sampleNames.length];
+  if (typeof detail === "string") {
+    return detail;
+  }
 
-        const participantId =
-          `P${deal.id}-${String(index + 1).padStart(3, "0")}`;
-
-        const joinedDay =
-          String((index % 25) + 1).padStart(2, "0");
-
-        return {
-          id: participantId,
-          dealId: deal.id,
-          name,
-          email:
-            `demo${deal.id}_${index + 1}@example.com`,
-          quantity: 1,
-          joinedDate: `2026-09-${joinedDay}`,
-          status:
-            deal.status === "successful"
-              ? "confirmed"
-              : deal.status === "failed"
-              ? "cancelled"
-              : index % 7 === 0
-              ? "pending"
-              : "joined"
-        };
-      }
-    );
-  });
+  return "Unable to load participants. Please try again.";
 }
 
-const demoParticipants =
-  createDemoParticipants(sellerDeals);
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleString();
+}
 
 function exportCsv(participants, deal) {
   const headers = [
     "Participant ID",
+    "Customer ID",
     "Customer Name",
-    "Email",
+    "Customer Email",
     "Deal",
-    "Quantity",
+    "Status",
     "Joined Date",
-    "Status"
+    "Delivery Name",
+    "Delivery Phone",
+    "Delivery Address",
+    "Delivery City",
+    "Delivery Postal Code",
   ];
 
   const rows = participants.map((participant) => [
     participant.id,
-    participant.name,
-    participant.email,
-    deal.name,
-    participant.quantity,
-    participant.joinedDate,
-    participant.status
+    participant.customer_id,
+    participant.customer_name,
+    participant.customer_email,
+    deal.product_name,
+    participant.status,
+    participant.joined_at,
+    participant.delivery_name,
+    participant.delivery_phone,
+    participant.delivery_address,
+    participant.delivery_city,
+    participant.delivery_postal_code,
   ]);
 
   const escapeCell = (value) =>
-    `"${String(value ?? "").replace(/"/g, '""')}"`;
+    `"${String(value ?? "")
+      .replace(/^[\s]*([=+\-@])/, "'$1")
+      .replace(/"/g, '""')}"`;
 
   const csv = [headers, ...rows]
     .map((row) => row.map(escapeCell).join(","))
@@ -130,126 +105,190 @@ function exportCsv(participants, deal) {
   const link = document.createElement("a");
 
   link.href = url;
-  link.download =
-    `bulkbuddy-participants-deal-${deal.id}.csv`;
+  link.download = `bulkbuddy-participants-deal-${deal.id}.csv`;
 
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  URL.revokeObjectURL(url);
 }
 
-const statusLabels = {
-  all: "All Participants",
-  joined: "Joined",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  cancelled: "Cancelled"
-};
-
 export default function Dealparticipants() {
-  const [searchParams, setSearchParams] =
-    useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const requestedDealId = Number(
-    searchParams.get("dealId")
-  );
+  const requestedDealId = searchParams.get("dealId");
 
-  const initialDeal =
-    sellerDeals.find(
-      (deal) => deal.id === requestedDealId
-    ) || sellerDeals[0];
+  const [deals, setDeals] = useState([]);
+  const [selectedDealId, setSelectedDealId] = useState("");
 
-  const [selectedDealId, setSelectedDealId] =
-    useState(initialDeal?.id ?? "");
+  const [participants, setParticipants] = useState([]);
+
+  const [loadingDeals, setLoadingDeals] = useState(true);
+  const [loadingParticipants, setLoadingParticipants] =
+    useState(false);
+
+  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState("all");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [selectedParticipant, setSelectedParticipant] =
     useState(null);
 
-  const selectedDeal = sellerDeals.find(
-    (deal) => deal.id === Number(selectedDealId)
+  // LOAD SELLER'S REAL DEALS
+  useEffect(() => {
+    let active = true;
+
+    const loadDeals = async () => {
+      try {
+        setLoadingDeals(true);
+        setError("");
+
+        const data = await getSellerDeals();
+
+        if (!active) return;
+
+        const sellerDeals = Array.isArray(data) ? data : [];
+
+        setDeals(sellerDeals);
+
+        const requested = sellerDeals.find(
+          (deal) => String(deal.id) === requestedDealId
+        );
+
+        const initialDeal = requested || sellerDeals[0];
+
+        setSelectedDealId(
+          initialDeal ? String(initialDeal.id) : ""
+        );
+      } catch (err) {
+        if (active) {
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (active) {
+          setLoadingDeals(false);
+        }
+      }
+    };
+
+    loadDeals();
+
+    return () => {
+      active = false;
+    };
+  }, [requestedDealId]);
+
+  const selectedDeal = deals.find(
+    (deal) => String(deal.id) === String(selectedDealId)
   );
 
-  const dealParticipants = useMemo(
-    () =>
-      demoParticipants.filter(
-        (participant) =>
-          participant.dealId ===
-          Number(selectedDealId)
-      ),
-    [selectedDealId]
-  );
+  // LOAD REAL PARTICIPANTS FOR SELECTED DEAL
+  useEffect(() => {
+    if (!selectedDealId) {
+      setParticipants([]);
+      return;
+    }
+
+    let active = true;
+
+    const loadParticipants = async () => {
+      try {
+        setLoadingParticipants(true);
+        setError("");
+        setParticipants([]);
+
+        const data = await getSellerDealParticipants(
+          selectedDealId
+        );
+
+        if (!active) return;
+
+        setParticipants(
+          Array.isArray(data.participants)
+            ? data.participants
+            : []
+        );
+      } catch (err) {
+        if (active) {
+          setParticipants([]);
+          setError(getErrorMessage(err));
+        }
+      } finally {
+        if (active) {
+          setLoadingParticipants(false);
+        }
+      }
+    };
+
+    loadParticipants();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDealId]);
 
   const filteredParticipants = useMemo(() => {
-    return dealParticipants.filter((participant) => {
-      const query = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
 
-      const matchesSearch =
-        participant.name
-          .toLowerCase()
-          .includes(query) ||
-        participant.email
-          .toLowerCase()
-          .includes(query) ||
-        participant.id
-          .toLowerCase()
-          .includes(query);
+    return participants.filter((participant) => {
+      const matchesSearch = [
+        participant.customer_name,
+        participant.customer_email,
+        participant.id,
+        participant.customer_id,
+      ].some((value) =>
+        String(value ?? "").toLowerCase().includes(query)
+      );
 
       const matchesStatus =
-        statusFilter === "all" ||
+        statusFilter === "ALL" ||
         participant.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [dealParticipants, search, statusFilter]);
+  }, [participants, search, statusFilter]);
 
-  const totalQuantity = dealParticipants.reduce(
-    (sum, participant) =>
-      sum + participant.quantity,
-    0
-  );
-
-  const confirmedCount = dealParticipants.filter(
-    (participant) =>
-      participant.status === "confirmed"
+  const joinedCount = participants.filter(
+    (participant) => participant.status === "JOINED"
   ).length;
 
-  const pendingCount = dealParticipants.filter(
-    (participant) =>
-      participant.status === "pending"
+  const waitingCount = participants.filter(
+    (participant) => participant.status === "WAITING"
   ).length;
 
-  const progress = selectedDeal
+  const cancelledCount = participants.filter(
+    (participant) => participant.status === "CANCELLED"
+  ).length;
+
+  const expiredCount = participants.filter(
+    (participant) => participant.status === "EXPIRED"
+  ).length;
+
+  const progress = selectedDeal?.minimum_buyers
     ? Math.min(
         Math.round(
-          (selectedDeal.participants /
-            selectedDeal.required) *
-            100
+          (joinedCount / selectedDeal.minimum_buyers) * 100
         ),
         100
       )
     : 0;
 
   const changeDeal = (event) => {
-    const nextId = Number(event.target.value);
+    const nextId = event.target.value;
 
     setSelectedDealId(nextId);
     setSearch("");
-    setStatusFilter("all");
+    setStatusFilter("ALL");
     setSelectedParticipant(null);
 
-    setSearchParams({
-      dealId: String(nextId)
-    });
+    setSearchParams({ dealId: nextId });
   };
 
   return (
     <SellerLayout title="Deal Participants">
+      {/* INTRO */}
       <section className="sdp-intro">
         <div>
           <small>GROUP BUYER MANAGEMENT</small>
@@ -257,8 +296,7 @@ export default function Dealparticipants() {
           <h2>Deal Participants</h2>
 
           <p>
-            View the customers who joined
-            your group deals.
+            View the customers who joined your group deals.
           </p>
         </div>
 
@@ -267,6 +305,15 @@ export default function Dealparticipants() {
         </div>
       </section>
 
+      {/* ERROR */}
+      {error && (
+        <div className="sdp-panel" role="alert">
+          <AlertCircle size={19} />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* DEAL SELECTOR */}
       <section className="sdp-panel sdp-deal-selector">
         <div>
           <label htmlFor="sdp-deal">
@@ -274,8 +321,8 @@ export default function Dealparticipants() {
           </label>
 
           <p>
-            Choose the product whose participants
-            you want to view.
+            Choose the product whose participants you want
+            to view.
           </p>
         </div>
 
@@ -283,20 +330,36 @@ export default function Dealparticipants() {
           id="sdp-deal"
           value={selectedDealId}
           onChange={changeDeal}
+          disabled={loadingDeals || deals.length === 0}
         >
-          {sellerDeals.map((deal) => (
-            <option
-              key={deal.id}
-              value={deal.id}
-            >
-              {deal.name}
+          {deals.length === 0 && (
+            <option value="">
+              {loadingDeals
+                ? "Loading deals..."
+                : "No deals available"}
+            </option>
+          )}
+
+          {deals.map((deal) => (
+            <option key={deal.id} value={deal.id}>
+              {deal.product_name}
             </option>
           ))}
         </select>
       </section>
 
+      {!loadingDeals && deals.length === 0 && (
+        <section className="sdp-panel">
+          <p>
+            You have not created any deals yet.
+            Create a deal first to view its participants.
+          </p>
+        </section>
+      )}
+
       {selectedDeal && (
         <>
+          {/* SELECTED DEAL SUMMARY */}
           <section className="sdp-deal-summary">
             <div className="sdp-summary-heading">
               <div className="sdp-product-icon">
@@ -305,8 +368,13 @@ export default function Dealparticipants() {
 
               <div>
                 <span>SELECTED GROUP DEAL</span>
-                <h3>{selectedDeal.name}</h3>
-                <p>{selectedDeal.category}</p>
+
+                <h3>{selectedDeal.product_name}</h3>
+
+                <p>
+                  {selectedDeal.description ||
+                    "Group buying deal"}
+                </p>
               </div>
             </div>
 
@@ -316,17 +384,17 @@ export default function Dealparticipants() {
 
                 <strong>
                   {formatPrice(
-                    selectedDeal.groupPrice
+                    Number(selectedDeal.group_price)
                   )}
                 </strong>
               </div>
 
               <div>
-                <small>Participants</small>
+                <small>Joined / Minimum Buyers</small>
 
                 <strong>
-                  {selectedDeal.participants}/
-                  {selectedDeal.required}
+                  {joinedCount}/
+                  {selectedDeal.minimum_buyers}
                 </strong>
               </div>
 
@@ -334,7 +402,9 @@ export default function Dealparticipants() {
                 <small>Status</small>
 
                 <span
-                  className={`sdp-status ${selectedDeal.status}`}
+                  className={`sdp-status ${String(
+                    selectedDeal.status
+                  ).toLowerCase()}`}
                 >
                   {selectedDeal.status}
                 </span>
@@ -343,44 +413,44 @@ export default function Dealparticipants() {
 
             <div className="sdp-progress-heading">
               <span>Group Progress</span>
+
               <strong>{progress}%</strong>
             </div>
 
             <div className="sdp-progress">
               <span
-                style={{
-                  width: `${progress}%`
-                }}
+                style={{ width: `${progress}%` }}
               />
             </div>
           </section>
 
+          {/* STATISTICS */}
           <section className="sdp-stats">
             {[
               {
-                title: "Total Participants",
-                value: dealParticipants.length,
+                title: "Total Records",
+                value: participants.length,
                 icon: Users,
-                style: "purple"
+                style: "purple",
               },
               {
-                title: "Total Quantity",
-                value: totalQuantity,
-                icon: ShoppingBag,
-                style: "blue"
-              },
-              {
-                title: "Confirmed",
-                value: confirmedCount,
+                title: "Joined",
+                value: joinedCount,
                 icon: CheckCircle2,
-                style: "green"
+                style: "green",
               },
               {
-                title: "Pending",
-                value: pendingCount,
+                title: "Waiting",
+                value: waitingCount,
                 icon: Clock3,
-                style: "pink"
-              }
+                style: "blue",
+              },
+              {
+                title: "Cancelled / Expired",
+                value: cancelledCount + expiredCount,
+                icon: XCircle,
+                style: "pink",
+              },
             ].map((item) => {
               const Icon = item.icon;
 
@@ -396,21 +466,24 @@ export default function Dealparticipants() {
                   </div>
 
                   <span>{item.title}</span>
-                  <strong>{item.value}</strong>
+
+                  <strong>
+                    {loadingParticipants ? "—" : item.value}
+                  </strong>
                 </article>
               );
             })}
           </section>
 
+          {/* PARTICIPANTS TABLE */}
           <section className="sdp-panel">
             <div className="sdp-table-heading">
               <div>
                 <h2>Participant List</h2>
 
                 <p>
-                  Showing{" "}
-                  {filteredParticipants.length} of{" "}
-                  {dealParticipants.length} participants
+                  Showing {filteredParticipants.length} of{" "}
+                  {participants.length} records
                 </p>
               </div>
 
@@ -418,6 +491,7 @@ export default function Dealparticipants() {
                 type="button"
                 className="sdp-export"
                 disabled={
+                  loadingParticipants ||
                   filteredParticipants.length === 0
                 }
                 onClick={() =>
@@ -432,6 +506,7 @@ export default function Dealparticipants() {
               </button>
             </div>
 
+            {/* SEARCH AND STATUS FILTER */}
             <div className="sdp-toolbar">
               <label className="sdp-search">
                 <Search size={18} />
@@ -450,21 +525,16 @@ export default function Dealparticipants() {
                 aria-label="Filter by status"
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(
-                    event.target.value
-                  )
+                  setStatusFilter(event.target.value)
                 }
               >
-                {Object.entries(
-                  statusLabels
-                ).map(([value, label]) => (
-                  <option
-                    key={value}
-                    value={value}
-                  >
-                    {label}
-                  </option>
-                ))}
+                {Object.entries(statusLabels).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  )
+                )}
               </select>
             </div>
 
@@ -474,7 +544,7 @@ export default function Dealparticipants() {
                   <tr>
                     <th>Participant</th>
                     <th>Participant ID</th>
-                    <th>Quantity</th>
+                    <th>Customer ID</th>
                     <th>Joined Date</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -488,40 +558,45 @@ export default function Dealparticipants() {
                         <td>
                           <div className="sdp-person">
                             <div className="sdp-avatar">
-                              {participant.name
+                              {String(
+                                participant.customer_name ||
+                                  "?"
+                              )
                                 .split(" ")
+                                .filter(Boolean)
                                 .map((part) => part[0])
                                 .slice(0, 2)
-                                .join("")}
+                                .join("")
+                                .toUpperCase()}
                             </div>
 
                             <div>
                               <strong>
-                                {participant.name}
+                                {participant.customer_name}
                               </strong>
 
                               <span>
-                                {participant.email}
+                                {participant.customer_email}
                               </span>
                             </div>
                           </div>
                         </td>
 
-                        <td>
-                          {participant.id}
-                        </td>
+                        <td>{participant.id}</td>
+
+                        <td>{participant.customer_id}</td>
 
                         <td>
-                          {participant.quantity}
-                        </td>
-
-                        <td>
-                          {participant.joinedDate}
+                          {formatDate(
+                            participant.joined_at
+                          )}
                         </td>
 
                         <td>
                           <span
-                            className={`sdp-status ${participant.status}`}
+                            className={`sdp-status ${String(
+                              participant.status
+                            ).toLowerCase()}`}
                           >
                             {participant.status}
                           </span>
@@ -545,20 +620,24 @@ export default function Dealparticipants() {
                     )
                   )}
 
-                  {filteredParticipants.length ===
-                    0 && (
+                  {filteredParticipants.length === 0 && (
                     <tr>
                       <td
                         colSpan={6}
                         className="sdp-empty"
                       >
                         <Users size={30} />
+
                         <strong>
-                          No participants found
+                          {loadingParticipants
+                            ? "Loading participants..."
+                            : "No participants found"}
                         </strong>
+
                         <span>
-                          Try another search
-                          or status filter.
+                          {loadingParticipants
+                            ? "Please wait."
+                            : "Try another search or status filter."}
                         </span>
                       </td>
                     </tr>
@@ -570,13 +649,7 @@ export default function Dealparticipants() {
         </>
       )}
 
-      <p className="sdp-demo-note">
-        This page uses generated sample customer
-        records. Participant counts come from the
-        existing seller demo deals. No real customer
-        data or payment records are displayed.
-      </p>
-
+      {/* PARTICIPANT DETAILS MODAL */}
       {selectedParticipant && selectedDeal && (
         <div
           className="sdp-modal-backdrop"
@@ -610,20 +683,25 @@ export default function Dealparticipants() {
             <div className="sdp-modal-body">
               <div className="sdp-modal-person">
                 <div className="sdp-avatar">
-                  {selectedParticipant.name
+                  {String(
+                    selectedParticipant.customer_name ||
+                      "?"
+                  )
                     .split(" ")
+                    .filter(Boolean)
                     .map((part) => part[0])
                     .slice(0, 2)
-                    .join("")}
+                    .join("")
+                    .toUpperCase()}
                 </div>
 
                 <div>
                   <h3>
-                    {selectedParticipant.name}
+                    {selectedParticipant.customer_name}
                   </h3>
 
                   <p>
-                    {selectedParticipant.email}
+                    {selectedParticipant.customer_email}
                   </p>
                 </div>
               </div>
@@ -631,44 +709,66 @@ export default function Dealparticipants() {
               {[
                 [
                   "Participant ID",
-                  selectedParticipant.id
+                  selectedParticipant.id,
+                ],
+                [
+                  "Customer ID",
+                  selectedParticipant.customer_id,
                 ],
                 [
                   "Deal",
-                  selectedDeal.name
+                  selectedDeal.product_name,
                 ],
                 [
                   "Group Price",
                   formatPrice(
-                    selectedDeal.groupPrice
-                  )
-                ],
-                [
-                  "Quantity",
-                  selectedParticipant.quantity
-                ],
-                [
-                  "Estimated Order Value",
-                  formatPrice(
-                    selectedDeal.groupPrice *
-                      selectedParticipant.quantity
-                  )
-                ],
-                [
-                  "Joined Date",
-                  selectedParticipant.joinedDate
+                    Number(selectedDeal.group_price)
+                  ),
                 ],
                 [
                   "Participation Status",
-                  selectedParticipant.status
-                ]
+                  selectedParticipant.status,
+                ],
+                [
+                  "Joined Date",
+                  formatDate(
+                    selectedParticipant.joined_at
+                  ),
+                ],
+                [
+                  "Last Updated",
+                  formatDate(
+                    selectedParticipant.updated_at
+                  ),
+                ],
+                [
+                  "Delivery Name",
+                  selectedParticipant.delivery_name,
+                ],
+                [
+                  "Delivery Phone",
+                  selectedParticipant.delivery_phone,
+                ],
+                [
+                  "Delivery Address",
+                  selectedParticipant.delivery_address,
+                ],
+                [
+                  "Delivery City",
+                  selectedParticipant.delivery_city,
+                ],
+                [
+                  "Postal Code",
+                  selectedParticipant.delivery_postal_code,
+                ],
               ].map(([label, value]) => (
                 <div
                   key={label}
                   className="sdp-modal-row"
                 >
                   <span>{label}</span>
-                  <strong>{value}</strong>
+
+                  <strong>{value ?? "—"}</strong>
                 </div>
               ))}
 

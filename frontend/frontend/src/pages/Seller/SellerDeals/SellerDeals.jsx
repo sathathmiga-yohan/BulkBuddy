@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+
 import {
   CheckCircle2,
   Clock3,
@@ -16,14 +17,16 @@ import {
 } from "lucide-react";
 
 import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
-import { sellerDeals } from "../sellerMockData.js";
-import { formatPrice } from "../../../data/mockDeals.js";
-import "./SellerDeals.css";
 
-// Same storage key used by Createdeal.jsx
-const STORAGE_KEY = "bulkbuddy_seller_created_deals_v1";
-const SAMPLE_EDITS_KEY = "bulkbuddy_seller_sample_edits_v1";
-const SAMPLE_DELETES_KEY = "bulkbuddy_seller_sample_deletes_v1";
+import {
+  getSellerDeals,
+  updateDeal,
+  deleteDeal,
+} from "../../../services/dealservice.js";
+
+import { formatPrice } from "../../../data/mockDeals.js";
+
+import "./SellerDeals.css";
 
 const statusOptions = [
   "all",
@@ -32,99 +35,101 @@ const statusOptions = [
   "failed",
 ];
 
-const categories = [
-  "Electronics",
-  "Accessories",
-  "Fashion",
-  "Home & Living",
-  "Beauty & Personal Care",
-  "Sports & Fitness",
-  "Other",
-];
+function getErrorMessage(error, fallback) {
+  const detail = error?.response?.data?.detail;
 
-function loadSellerDeals() {
-  try {
-    const created = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) || "[]"
-    );
+  if (typeof detail === "string") return detail;
 
-    const edits = JSON.parse(
-      localStorage.getItem(SAMPLE_EDITS_KEY) || "{}"
-    );
-
-    const deleted = JSON.parse(
-      localStorage.getItem(SAMPLE_DELETES_KEY) || "[]"
-    );
-
-    const createdDeals = Array.isArray(created)
-      ? created
-      : [];
-
-    const deletedIds = Array.isArray(deleted)
-      ? deleted
-      : [];
-
-    const sampleDeals = sellerDeals
-      .filter(
-        (deal) =>
-          !deletedIds.includes(String(deal.id))
-      )
-      .map((deal) => ({
-        ...deal,
-        ...(edits[String(deal.id)] || {}),
-      }));
-
-    return [...createdDeals, ...sampleDeals];
-  } catch (error) {
-    console.error("Unable to load seller deals:", error);
-    return sellerDeals;
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg || "Invalid value").join(", ");
   }
+
+  return fallback;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleString();
+}
+
+function toLocalDateTime(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const local = new Date(
+    date.getTime() - date.getTimezoneOffset() * 60000
+  );
+
+  return local.toISOString().slice(0, 16);
+}
+
+function createEditForm(deal) {
+  return {
+    id: deal.id,
+    product_name: deal.product_name,
+    description: deal.description || "",
+    normal_price: String(deal.normal_price),
+    group_price: String(deal.group_price),
+    minimum_buyers: String(deal.minimum_buyers),
+    maximum_quantity: String(deal.maximum_quantity),
+    deadline: toLocalDateTime(deal.deadline),
+  };
 }
 
 export default function SellerDeals() {
-  const [deals, setDeals] = useState(loadSellerDeals);
+  const [deals, setDeals] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [selectedDeal, setSelectedDeal] = useState(null);
   const [editingDeal, setEditingDeal] = useState(null);
   const [deletingDeal, setDeletingDeal] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  const loadDeals = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await getSellerDeals();
+
+      setDeals(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(
+        getErrorMessage(err, "Unable to load your deals.")
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const refresh = () => {
-      setDeals(loadSellerDeals());
-    };
-
-    window.addEventListener(
-      "bulkbuddy-deals-updated",
-      refresh
-    );
-
-    window.addEventListener("storage", refresh);
-
-    return () => {
-      window.removeEventListener(
-        "bulkbuddy-deals-updated",
-        refresh
-      );
-
-      window.removeEventListener("storage", refresh);
-    };
+    loadDeals();
   }, []);
 
   const filteredDeals = useMemo(() => {
     return deals.filter((deal) => {
-      const searchText = search.trim().toLowerCase();
-
-      const matchesSearch =
-        `${deal.name} ${deal.category}`
-          .toLowerCase()
-          .includes(searchText);
+      const matchesSearch = (
+        `${deal.product_name} ${deal.description || ""}`
+      )
+        .toLowerCase()
+        .includes(search.trim().toLowerCase());
 
       const matchesStatus =
         statusFilter === "all" ||
-        deal.status === statusFilter;
+        String(deal.status).toLowerCase() === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -132,21 +137,20 @@ export default function SellerDeals() {
 
   const counts = {
     all: deals.length,
-
     active: deals.filter(
-      (deal) => deal.status === "active"
+      (deal) => String(deal.status).toUpperCase() === "ACTIVE"
     ).length,
-
     successful: deals.filter(
-      (deal) => deal.status === "successful"
+      (deal) => String(deal.status).toUpperCase() === "SUCCESSFUL"
     ).length,
-
     failed: deals.filter(
-      (deal) => deal.status === "failed"
+      (deal) => String(deal.status).toUpperCase() === "FAILED"
     ).length,
   };
 
   const closeModal = () => {
+    if (saving) return;
+
     setSelectedDeal(null);
     setEditingDeal(null);
     setDeletingDeal(null);
@@ -159,201 +163,85 @@ export default function SellerDeals() {
     }));
   };
 
-  // EDIT DEAL
-  const saveEditedDeal = (event) => {
+  const saveEditedDeal = async (event) => {
     event.preventDefault();
 
-    if (!editingDeal) return;
+    if (!editingDeal || saving) return;
 
-    const groupPrice = Number(editingDeal.groupPrice);
-    const required = Number(editingDeal.required);
-    const participants = Number(
-      editingDeal.participants || 0
-    );
+    const normalPrice = Number(editingDeal.normal_price);
+    const groupPrice = Number(editingDeal.group_price);
+    const minimumBuyers = Number(editingDeal.minimum_buyers);
+    const maximumQuantity = Number(editingDeal.maximum_quantity);
+
+    const deadline = new Date(editingDeal.deadline);
 
     if (
-      !editingDeal.name.trim() ||
-      !editingDeal.category.trim() ||
+      editingDeal.product_name.trim().length < 2 ||
+      !Number.isFinite(normalPrice) ||
       !Number.isFinite(groupPrice) ||
+      normalPrice <= 0 ||
       groupPrice <= 0 ||
-      !Number.isInteger(required) ||
-      required < 1 ||
-      required < participants ||
-      !editingDeal.endDate
+      groupPrice >= normalPrice ||
+      !Number.isInteger(minimumBuyers) ||
+      minimumBuyers < 1 ||
+      !Number.isInteger(maximumQuantity) ||
+      maximumQuantity < minimumBuyers ||
+      Number.isNaN(deadline.getTime()) ||
+      deadline.getTime() <= Date.now()
     ) {
       setNotice(
-        "Please enter valid details. Required buyers cannot be less than existing participants."
+        "Please enter valid details. Group price must be lower than normal price, capacity must be valid, and deadline must be in the future."
       );
       return;
     }
 
     try {
-      const isCreatedDeal = String(
-        editingDeal.id
-      ).startsWith("seller-");
+      setSaving(true);
+      setNotice("");
 
-      if (isCreatedDeal) {
-        const saved = JSON.parse(
-          localStorage.getItem(STORAGE_KEY) || "[]"
-        );
+      const payload = {
+        product_name: editingDeal.product_name.trim(),
+        description: editingDeal.description.trim() || null,
+        normal_price: normalPrice,
+        group_price: groupPrice,
+        minimum_buyers: minimumBuyers,
+        maximum_quantity: maximumQuantity,
+        deadline: deadline.toISOString(),
+      };
 
-        const createdDeals = Array.isArray(saved)
-          ? saved
-          : [];
+      await updateDeal(editingDeal.id, payload);
 
-        const updatedDeals = createdDeals.map(
-          (deal) => {
-            if (
-              String(deal.id) !==
-              String(editingDeal.id)
-            ) {
-              return deal;
-            }
-
-            const deadline = new Date(
-              `${editingDeal.endDate}T23:59:59`
-            );
-
-            const discount =
-              deal.originalPrice > 0
-                ? Math.round(
-                    (1 -
-                      groupPrice /
-                        deal.originalPrice) *
-                      100
-                  )
-                : 0;
-
-            return {
-              ...deal,
-              ...editingDeal,
-
-              groupPrice,
-              required,
-
-              // Preserve existing participation data.
-              joined: deal.joined,
-              participants: deal.participants,
-
-              discount,
-
-              daysLeft: Math.max(
-                0,
-                Math.ceil(
-                  (deadline - new Date()) /
-                    86400000
-                )
-              ),
-            };
-          }
-        );
-
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify(updatedDeals)
-        );
-      } else {
-        // Keep sample seller edits in separate storage.
-        const savedEdits = JSON.parse(
-          localStorage.getItem(SAMPLE_EDITS_KEY) ||
-            "{}"
-        );
-
-        savedEdits[String(editingDeal.id)] = {
-          ...editingDeal,
-          groupPrice,
-          required,
-        };
-
-        localStorage.setItem(
-          SAMPLE_EDITS_KEY,
-          JSON.stringify(savedEdits)
-        );
-      }
-
-      setDeals(loadSellerDeals());
-
-      window.dispatchEvent(
-        new Event("bulkbuddy-deals-updated")
-      );
-
+      setEditingDeal(null);
+      setNotice("Deal updated successfully.");
+      await loadDeals();
+    } catch (err) {
       setNotice(
-        "Deal updated successfully in this browser."
+        getErrorMessage(err, "Unable to update this deal.")
       );
-
-      closeModal();
-    } catch (error) {
-      console.error("Unable to edit deal:", error);
-      setNotice("Unable to save changes.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // DELETE DEAL
-  const confirmDelete = () => {
-    if (!deletingDeal) return;
+  const confirmDelete = async () => {
+    if (!deletingDeal || saving) return;
 
     try {
-      const isCreatedDeal = String(
-        deletingDeal.id
-      ).startsWith("seller-");
+      setSaving(true);
+      setNotice("");
 
-      if (isCreatedDeal) {
-        const saved = JSON.parse(
-          localStorage.getItem(STORAGE_KEY) || "[]"
-        );
+      await deleteDeal(deletingDeal.id);
 
-        const createdDeals = Array.isArray(saved)
-          ? saved
-          : [];
+      setDeletingDeal(null);
+      setNotice("Deal permanently deleted successfully.");
 
-        const remainingDeals = createdDeals.filter(
-          (deal) =>
-            String(deal.id) !==
-            String(deletingDeal.id)
-        );
-
-        localStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify(remainingDeals)
-        );
-      } else {
-        const saved = JSON.parse(
-          localStorage.getItem(
-            SAMPLE_DELETES_KEY
-          ) || "[]"
-        );
-
-        const deletedIds = Array.isArray(saved)
-          ? saved
-          : [];
-
-        const updatedIds = [
-          ...new Set([
-            ...deletedIds,
-            String(deletingDeal.id),
-          ]),
-        ];
-
-        localStorage.setItem(
-          SAMPLE_DELETES_KEY,
-          JSON.stringify(updatedIds)
-        );
-      }
-
-      setDeals(loadSellerDeals());
-
-      window.dispatchEvent(
-        new Event("bulkbuddy-deals-updated")
-      );
-
+      await loadDeals();
+    } catch (err) {
       setNotice(
-        "Deal deleted successfully in this browser."
+        getErrorMessage(err, "Unable to delete this deal.")
       );
-
-      closeModal();
-    } catch (error) {
-      console.error("Unable to delete deal:", error);
-      setNotice("Unable to delete deal.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -363,12 +251,8 @@ export default function SellerDeals() {
       <section className="sdeals-intro">
         <div>
           <small>DEAL MANAGEMENT</small>
-
           <h2>Manage Your Group Deals</h2>
-
-          <p>
-            View, filter and manage your product deals.
-          </p>
+          <p>View, filter and manage your product deals.</p>
         </div>
 
         <Link
@@ -381,16 +265,16 @@ export default function SellerDeals() {
       </section>
 
       {/* NOTIFICATION */}
-      {notice && (
-        <div
-          className="sdeals-notice"
-          role="status"
-        >
-          <span>{notice}</span>
+      {(notice || error) && (
+        <div className="sdeals-notice" role="status">
+          <span>{error || notice}</span>
 
           <button
             type="button"
-            onClick={() => setNotice("")}
+            onClick={() => {
+              setNotice("");
+              setError("");
+            }}
             aria-label="Dismiss notification"
           >
             <X size={17} />
@@ -401,45 +285,25 @@ export default function SellerDeals() {
       {/* STATS */}
       <section className="sdeals-stats">
         {[
-          {
-            key: "all",
-            label: "Total Deals",
-            icon: Package,
-          },
-          {
-            key: "active",
-            label: "Active Deals",
-            icon: Clock3,
-          },
+          { key: "all", label: "Total Deals", icon: Package },
+          { key: "active", label: "Active Deals", icon: Clock3 },
           {
             key: "successful",
             label: "Successful",
             icon: CheckCircle2,
           },
-          {
-            key: "failed",
-            label: "Failed Deals",
-            icon: XCircle,
-          },
+          { key: "failed", label: "Failed Deals", icon: XCircle },
         ].map((item) => {
           const Icon = item.icon;
 
           return (
-            <article
-              key={item.key}
-              className="sdeals-stat"
-            >
-              <div
-                className={`sdeals-stat-icon ${item.key}`}
-              >
+            <article key={item.key} className="sdeals-stat">
+              <div className={`sdeals-stat-icon ${item.key}`}>
                 <Icon size={21} />
               </div>
 
               <span>{item.label}</span>
-
-              <strong>
-                {counts[item.key]}
-              </strong>
+              <strong>{loading ? "..." : counts[item.key]}</strong>
             </article>
           );
         })}
@@ -450,26 +314,22 @@ export default function SellerDeals() {
         <div className="sdeals-panel-header">
           <div>
             <h2>All Product Deals</h2>
-
             <p>
-              Showing {filteredDeals.length} of{" "}
-              {deals.length} deals
+              Showing {filteredDeals.length} of {deals.length} deals
             </p>
           </div>
         </div>
 
-        {/* SEARCH AND FILTERS */}
+        {/* SEARCH AND FILTER */}
         <div className="sdeals-toolbar">
           <label className="sdeals-search">
             <Search size={18} />
 
             <input
               type="search"
-              placeholder="Search product or category..."
+              placeholder="Search product..."
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
+              onChange={(event) => setSearch(event.target.value)}
             />
           </label>
 
@@ -479,18 +339,13 @@ export default function SellerDeals() {
                 key={option}
                 type="button"
                 className={
-                  statusFilter === option
-                    ? "active"
-                    : ""
+                  statusFilter === option ? "active" : ""
                 }
-                onClick={() =>
-                  setStatusFilter(option)
-                }
+                onClick={() => setStatusFilter(option)}
               >
                 {option === "all"
                   ? "All Deals"
-                  : option[0].toUpperCase() +
-                    option.slice(1)}
+                  : option[0].toUpperCase() + option.slice(1)}
               </button>
             ))}
           </div>
@@ -511,151 +366,119 @@ export default function SellerDeals() {
             </thead>
 
             <tbody>
-              {filteredDeals.map((deal) => {
-                const participants = Number(
-                  deal.participants || 0
-                );
-
-                const required = Number(
-                  deal.required || 1
-                );
-
-                const progress = Math.min(
-                  Math.round(
-                    (participants / required) *
-                      100
-                  ),
-                  100
-                );
-
-                return (
-                  <tr key={deal.id}>
-                    {/* PRODUCT */}
-                    <td>
-                      <div className="sdeals-product">
-                        <div className="sdeals-product-icon">
-                          <Package size={19} />
-                        </div>
-
-                        <div>
-                          <strong>
-                            {deal.name}
-                          </strong>
-
-                          <span>
-                            {deal.category}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* PRICE */}
-                    <td className="sdeals-price">
-                      {formatPrice(
-                        deal.groupPrice
-                      )}
-                    </td>
-
-                    {/* PARTICIPANTS */}
-                    <td>
-                      <span className="sdeals-buyers">
-                        <Users size={15} />
-
-                        {participants}/{required}
-                      </span>
-                    </td>
-
-                    {/* PROGRESS */}
-                    <td>
-                      <span className="sdeals-percent">
-                        {progress}%
-                      </span>
-
-                      <div className="sdeals-progress">
-                        <span
-                          style={{
-                            width: `${progress}%`,
-                          }}
-                        />
-                      </div>
-                    </td>
-
-                    {/* STATUS */}
-                    <td>
-                      <span
-                        className={`sdeals-status ${deal.status}`}
-                      >
-                        {deal.status}
-                      </span>
-                    </td>
-
-                    {/* END DATE */}
-                    <td>{deal.endDate}</td>
-
-                    {/* ACTIONS */}
-                    <td>
-                      <div className="sdeals-actions">
-                        <button
-                          type="button"
-                          className="view"
-                          title="View Deal"
-                          aria-label={`View ${deal.name}`}
-                          onClick={() =>
-                            setSelectedDeal(deal)
-                          }
-                        >
-                          <Eye size={17} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="edit"
-                          title="Edit Deal"
-                          aria-label={`Edit ${deal.name}`}
-                          onClick={() => {
-                            setNotice("");
-                            setEditingDeal({
-                              ...deal,
-                            });
-                          }}
-                        >
-                          <Edit3 size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="delete"
-                          title="Delete Deal"
-                          aria-label={`Delete ${deal.name}`}
-                          onClick={() =>
-                            setDeletingDeal(deal)
-                          }
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {filteredDeals.length === 0 && (
+              {loading ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="sdeals-empty"
-                  >
-                    <Package size={34} />
-
-                    <strong>
-                      No deals found
-                    </strong>
-
-                    <span>
-                      Try another search or filter.
-                    </span>
+                  <td colSpan={7} className="sdeals-empty">
+                    Loading your deals...
                   </td>
                 </tr>
+              ) : (
+                <>
+                  {filteredDeals.map((deal) => {
+                    const dealStatus = String(
+                      deal.status || ""
+                    ).toLowerCase();
+
+                    return (
+                      <tr key={deal.id}>
+                        {/* PRODUCT */}
+                        <td>
+                          <div className="sdeals-product">
+                            <div className="sdeals-product-icon">
+                              <Package size={19} />
+                            </div>
+
+                            <div>
+                              <strong>{deal.product_name}</strong>
+                              <span>Deal #{deal.id}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* PRICE */}
+                        <td className="sdeals-price">
+                          {formatPrice(Number(deal.group_price))}
+                        </td>
+
+                        {/* PARTICIPANTS */}
+                        <td>
+                          <span className="sdeals-buyers">
+                            <Users size={15} />
+                            — / {deal.minimum_buyers}
+                          </span>
+                        </td>
+
+                        {/* PROGRESS */}
+                        <td>
+                          <span className="sdeals-percent">—</span>
+                        </td>
+
+                        {/* STATUS */}
+                        <td>
+                          <span
+                            className={`sdeals-status ${dealStatus}`}
+                          >
+                            {dealStatus}
+                          </span>
+                        </td>
+
+                        {/* END DATE */}
+                        <td>{formatDate(deal.deadline)}</td>
+
+                        {/* ACTIONS */}
+                        <td>
+                          <div className="sdeals-actions">
+                            <button
+                              type="button"
+                              className="view"
+                              title="View Deal"
+                              aria-label={`View ${deal.product_name}`}
+                              onClick={() => setSelectedDeal(deal)}
+                            >
+                              <Eye size={17} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="edit"
+                              title="Edit Deal"
+                              aria-label={`Edit ${deal.product_name}`}
+                              onClick={() => {
+                                setNotice("");
+                                setEditingDeal(createEditForm(deal));
+                              }}
+                            >
+                              <Edit3 size={16} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="delete"
+                              title="Delete Deal"
+                              aria-label={`Delete ${deal.product_name}`}
+                              onClick={() => {
+                                setNotice("");
+                                setDeletingDeal(deal);
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredDeals.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="sdeals-empty">
+                        <Package size={34} />
+                        <strong>No deals found</strong>
+                        <span>Try another search or filter.</span>
+                      </td>
+                    </tr>
+                  )}
+                </>
               )}
             </tbody>
           </table>
@@ -663,8 +486,7 @@ export default function SellerDeals() {
 
         <footer className="sdeals-table-footer">
           <span>
-            Demo data is saved in this browser.
-            The backend database is not connected yet.
+            Deals are loaded from the Backend database.
           </span>
         </footer>
       </section>
@@ -680,9 +502,7 @@ export default function SellerDeals() {
             role="dialog"
             aria-modal="true"
             aria-label="Deal Details"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             <header>
               <h2>Deal Details</h2>
@@ -697,50 +517,51 @@ export default function SellerDeals() {
             </header>
 
             <div className="sdeals-modal-content">
-              <h3>{selectedDeal.name}</h3>
+              <h3>{selectedDeal.product_name}</h3>
 
               <span
-                className={`sdeals-status ${selectedDeal.status}`}
+                className={`sdeals-status ${String(
+                  selectedDeal.status
+                ).toLowerCase()}`}
               >
                 {selectedDeal.status}
               </span>
 
               <div className="sdeals-detail-list">
                 <p>
-                  <span>Category</span>
+                  <span>Description</span>
                   <strong>
-                    {selectedDeal.category}
+                    {selectedDeal.description || "—"}
+                  </strong>
+                </p>
+
+                <p>
+                  <span>Normal Price</span>
+                  <strong>
+                    {formatPrice(Number(selectedDeal.normal_price))}
                   </strong>
                 </p>
 
                 <p>
                   <span>Group Price</span>
                   <strong>
-                    {formatPrice(
-                      selectedDeal.groupPrice
-                    )}
+                    {formatPrice(Number(selectedDeal.group_price))}
                   </strong>
                 </p>
 
                 <p>
-                  <span>Participants</span>
-                  <strong>
-                    {selectedDeal.participants || 0}
-                  </strong>
+                  <span>Minimum Buyers</span>
+                  <strong>{selectedDeal.minimum_buyers}</strong>
                 </p>
 
                 <p>
-                  <span>Required Buyers</span>
-                  <strong>
-                    {selectedDeal.required}
-                  </strong>
+                  <span>Maximum Capacity</span>
+                  <strong>{selectedDeal.maximum_quantity}</strong>
                 </p>
 
                 <p>
-                  <span>End Date</span>
-                  <strong>
-                    {selectedDeal.endDate}
-                  </strong>
+                  <span>Deadline</span>
+                  <strong>{formatDate(selectedDeal.deadline)}</strong>
                 </p>
               </div>
 
@@ -767,9 +588,7 @@ export default function SellerDeals() {
             role="dialog"
             aria-modal="true"
             aria-label="Edit Deal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             <header>
               <h2>Edit Deal</h2>
@@ -777,6 +596,7 @@ export default function SellerDeals() {
               <button
                 type="button"
                 onClick={closeModal}
+                disabled={saving}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -788,113 +608,118 @@ export default function SellerDeals() {
               onSubmit={saveEditedDeal}
             >
               <p>
-                Changes to your newly created deals
-                will also appear on the customer
-                deals page in this browser.
+                Changes will be saved to the Backend database.
+                Existing participation and deadline rules are
+                validated by the Backend.
               </p>
 
-              {/* PRODUCT NAME */}
               <label>
                 Product Name
-
                 <input
                   required
                   type="text"
-                  value={editingDeal.name}
+                  minLength={2}
+                  maxLength={200}
+                  value={editingDeal.product_name}
                   onChange={(event) =>
                     updateEditField(
-                      "name",
+                      "product_name",
                       event.target.value
                     )
                   }
                 />
               </label>
 
-              {/* CATEGORY */}
               <label>
-                Category
-
-                <select
-                  value={editingDeal.category}
+                Description
+                <textarea
+                  value={editingDeal.description}
                   onChange={(event) =>
                     updateEditField(
-                      "category",
+                      "description",
                       event.target.value
                     )
                   }
-                >
-                  {[
-                    ...new Set([
-                      editingDeal.category,
-                      ...categories,
-                    ]),
-                  ].map((category) => (
-                    <option
-                      key={category}
-                      value={category}
-                    >
-                      {category}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
 
-              {/* GROUP PRICE */}
+              <label>
+                Normal Price (LKR)
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={editingDeal.normal_price}
+                  onChange={(event) =>
+                    updateEditField(
+                      "normal_price",
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
+
               <label>
                 Group Price (LKR)
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={editingDeal.group_price}
+                  onChange={(event) =>
+                    updateEditField(
+                      "group_price",
+                      event.target.value
+                    )
+                  }
+                />
+              </label>
 
+              <label>
+                Minimum Buyers
                 <input
                   required
                   type="number"
                   min="1"
-                  step="0.01"
-                  value={
-                    editingDeal.groupPrice
-                  }
+                  step="1"
+                  value={editingDeal.minimum_buyers}
                   onChange={(event) =>
                     updateEditField(
-                      "groupPrice",
+                      "minimum_buyers",
                       event.target.value
                     )
                   }
                 />
               </label>
 
-              {/* REQUIRED BUYERS */}
               <label>
-                Required Buyers
-
+                Maximum Quantity
                 <input
                   required
                   type="number"
-                  min={Math.max(
-                    1,
-                    Number(
-                      editingDeal.participants || 0
-                    )
-                  )}
+                  min="1"
                   step="1"
-                  value={editingDeal.required}
+                  value={editingDeal.maximum_quantity}
                   onChange={(event) =>
                     updateEditField(
-                      "required",
+                      "maximum_quantity",
                       event.target.value
                     )
                   }
                 />
               </label>
 
-              {/* END DATE */}
               <label>
-                End Date
-
+                Deadline
                 <input
                   required
-                  type="date"
-                  value={editingDeal.endDate}
+                  type="datetime-local"
+                  value={editingDeal.deadline}
                   onChange={(event) =>
                     updateEditField(
-                      "endDate",
+                      "deadline",
                       event.target.value
                     )
                   }
@@ -905,6 +730,7 @@ export default function SellerDeals() {
                 <button
                   type="button"
                   onClick={closeModal}
+                  disabled={saving}
                 >
                   Cancel
                 </button>
@@ -912,8 +738,9 @@ export default function SellerDeals() {
                 <button
                   type="submit"
                   className="sdeals-modal-primary"
+                  disabled={saving}
                 >
-                  Save Changes
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -932,9 +759,7 @@ export default function SellerDeals() {
             role="alertdialog"
             aria-modal="true"
             aria-label="Delete Deal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
+            onClick={(event) => event.stopPropagation()}
           >
             <header>
               <h2>Delete Deal?</h2>
@@ -942,6 +767,7 @@ export default function SellerDeals() {
               <button
                 type="button"
                 onClick={closeModal}
+                disabled={saving}
                 aria-label="Close"
               >
                 <X size={20} />
@@ -954,23 +780,22 @@ export default function SellerDeals() {
               </div>
 
               <p>
-                Remove{" "}
-                <strong>
-                  {deletingDeal.name}
-                </strong>{" "}
-                from this demo list?
+                Permanently delete{" "}
+                <strong>{deletingDeal.product_name}</strong>?
               </p>
 
               <small>
-                This will remove the deal from
-                browser demo data, not from the
-                backend database.
+                This action requests deletion from the actual
+                Backend database. It cannot be undone. The
+                Backend may reject deletion if participation
+                history exists.
               </small>
 
               <div className="sdeals-modal-buttons">
                 <button
                   type="button"
                   onClick={closeModal}
+                  disabled={saving}
                 >
                   Cancel
                 </button>
@@ -979,8 +804,9 @@ export default function SellerDeals() {
                   type="button"
                   className="sdeals-danger"
                   onClick={confirmDelete}
+                  disabled={saving}
                 >
-                  Delete Deal
+                  {saving ? "Deleting..." : "Delete Deal"}
                 </button>
               </div>
             </div>

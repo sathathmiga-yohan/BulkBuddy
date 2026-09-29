@@ -154,19 +154,26 @@ def generate_orders_for_deal(
 
         # VALIDATE DELIVERY DETAILS
 
+        
+        # VALIDATE DELIVERY DETAILS
+
         if not all([
             participation.delivery_name,
-            participation.phone,
-            participation.address,
-            participation.city,
+            participation.delivery_phone,
+            participation.delivery_address,
+            participation.delivery_city,
         ]):
             raise ValueError(
                 "Missing delivery details for "
                 f"participation {participation.id}"
             )
 
+
         # CREATE COD ORDER
     
+      
+        # CREATE COD ORDER
+
         new_order = Order(
             deal_id=deal.id,
             customer_id=participation.customer_id,
@@ -176,10 +183,10 @@ def generate_orders_for_deal(
 
             # Copy delivery details from Participation.
             delivery_name=participation.delivery_name,
-            delivery_phone=participation.phone,
-            delivery_address=participation.address,
-            delivery_city=participation.city,
-            delivery_postal_code=participation.postal_code,
+            delivery_phone=participation.delivery_phone,
+            delivery_address=participation.delivery_address,
+            delivery_city=participation.delivery_city,
+            delivery_postal_code=participation.delivery_postal_code,
 
             status=OrderStatus.CONFIRMED,
             payment_status=PaymentStatus.PENDING,
@@ -188,6 +195,7 @@ def generate_orders_for_deal(
             created_at=utc_now(),
             updated_at=utc_now(),
         )
+
 
         db.add(new_order)
 

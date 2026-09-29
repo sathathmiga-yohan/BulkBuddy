@@ -1,7 +1,7 @@
-
 import { Routes, Route, Link } from "react-router-dom";
 
 import Navbar from "./components/Navbar/Navbar.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 import Home from "./pages/Home/Home.jsx";
 import Deals from "./pages/Deals/Deals.jsx";
@@ -44,6 +44,9 @@ export default function App() {
       <Navbar />
 
       <Routes>
+
+        {/* PUBLIC PAGES */}
+
         <Route path="/" element={<Home />} />
 
         <Route
@@ -67,16 +70,6 @@ export default function App() {
         />
 
         <Route
-          path="/my-deals"
-          element={<MyDeals />}
-        />
-
-        <Route
-          path="/customer/dashboard"
-          element={<MyDeals />}
-        />
-
-        <Route
           path="/how-it-works"
           element={<HowItWorks />}
         />
@@ -86,42 +79,92 @@ export default function App() {
           element={<About />}
         />
 
+        {/* CUSTOMER PAGES */}
+
+        <Route
+          path="/my-deals"
+          element={
+            <ProtectedRoute allowedRoles={["CUSTOMER"]}>
+              <MyDeals />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/customer/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["CUSTOMER"]}>
+              <MyDeals />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* SELLER PAGES */}
+
         <Route
           path="/seller/dashboard"
-          element={<SellerDashboard />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <SellerDashboard />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/create-deal"
-          element={<Createdeal />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <Createdeal />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/deals"
-          element={<SellerDeals />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <SellerDeals />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/import"
-          element={<CsvImport />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <CsvImport />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/participants"
-          element={<Dealparticipants />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <Dealparticipants />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/reports"
-          element={<Reports />}
+          element={
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <Reports />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/seller/settings"
           element={
-            <PlaceholderPage title="Seller Settings" />
+            <ProtectedRoute allowedRoles={["SELLER"]}>
+              <PlaceholderPage title="Seller Settings" />
+            </ProtectedRoute>
           }
         />
+
+        {/* PAGE NOT FOUND */}
 
         <Route
           path="*"
@@ -129,6 +172,7 @@ export default function App() {
             <PlaceholderPage title="Page Not Found" />
           }
         />
+
       </Routes>
     </>
   );

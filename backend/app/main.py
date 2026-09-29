@@ -26,10 +26,7 @@ from app.models.participation import Participation
 from app.models.order import Order
 from app.models.notification import Notification
 
-
-# ==========================================
 # DEADLINE SCHEDULER
-# ==========================================
 
 scheduler = BackgroundScheduler(
     timezone="UTC"
@@ -45,10 +42,7 @@ scheduler.add_job(
     coalesce=True,
 )
 
-
-# ==========================================
 # APPLICATION LIFESPAN
-# ==========================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,9 +58,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-# ==========================================
 # CREATE FASTAPI APPLICATION
-# ==========================================
 
 app = FastAPI(
     title="BulkBuddy API",
@@ -76,9 +68,7 @@ app = FastAPI(
 )
 
 
-# ==========================================
 # CORS CONFIGURATION
-# ==========================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,9 +82,7 @@ app.add_middleware(
 )
 
 
-# ==========================================
 # INCLUDE ALL ROUTERS
-# ==========================================
 
 app.include_router(auth.router)
 
@@ -111,9 +99,7 @@ app.include_router(reports.router)
 app.include_router(notifications.router)
 
 
-# ==========================================
 # ROOT ENDPOINT
-# ==========================================
 
 @app.get("/")
 def root():

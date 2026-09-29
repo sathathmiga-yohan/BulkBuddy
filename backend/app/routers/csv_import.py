@@ -1,4 +1,3 @@
-
 import csv
 import io
 
@@ -26,14 +25,20 @@ from app.services.deal_service import (
     validate_deal_values,
 )
 
+
+# ==========================================
 # CSV IMPORT ROUTER
+# ==========================================
 
 router = APIRouter(
     prefix="/deals",
     tags=["CSV Import"]
 )
 
+
+# ==========================================
 # REQUIRED CSV HEADERS
+# ==========================================
 
 REQUIRED_COLUMNS = {
     "product_name",
@@ -45,7 +50,10 @@ REQUIRED_COLUMNS = {
     "deadline",
 }
 
+
+# ==========================================
 # IMPORT DEALS FROM CSV
+# ==========================================
 
 @router.post(
     "/import-csv",
@@ -57,7 +65,9 @@ async def import_deals_from_csv(
     current_user: User = Depends(require_seller)
 ):
 
+    # ==========================================
     # CHECK FILE EXTENSION
+    # ==========================================
 
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
@@ -65,7 +75,9 @@ async def import_deals_from_csv(
             detail="Please upload a valid CSV file"
         )
 
+    # ==========================================
     # READ AND DECODE FILE
+    # ==========================================
 
     try:
 
@@ -92,7 +104,9 @@ async def import_deals_from_csv(
             detail="CSV file is empty"
         )
 
+    # ==========================================
     # PARSE CSV
+    # ==========================================
 
     csv_reader = csv.DictReader(
         io.StringIO(decoded_content)
@@ -104,13 +118,16 @@ async def import_deals_from_csv(
             detail="CSV headers are missing"
         )
 
-    # Remove accidental whitespace from header names.
+    # Remove accidental whitespace from headers.
+
     csv_reader.fieldnames = [
         header.strip()
         for header in csv_reader.fieldnames
     ]
 
+    # ==========================================
     # CHECK REQUIRED COLUMNS
+    # ==========================================
 
     missing_columns = REQUIRED_COLUMNS - set(
         csv_reader.fieldnames
@@ -125,7 +142,9 @@ async def import_deals_from_csv(
             }
         )
 
+    # ==========================================
     # PROCESS EACH CSV ROW
+    # ==========================================
 
     created_count = 0
     errors = []
@@ -136,6 +155,7 @@ async def import_deals_from_csv(
     ):
 
         # Ignore completely empty lines.
+
         if not any(
             str(value).strip()
             for value in row.values()
@@ -145,20 +165,30 @@ async def import_deals_from_csv(
 
         try:
 
-            # Extra unnamed CSV values indicate a
-            # malformed row.
+            # ==========================================
+            # CHECK MALFORMED ROW
+            # ==========================================
+
             if None in row:
                 raise ValueError(
                     "Row contains more values than the CSV headers"
                 )
 
-            # Required values must not be missing.
+            # ==========================================
+            # CHECK MISSING REQUIRED VALUES
+            # ==========================================
+
+            # Description column must exist in CSV,
+            # but its value can be empty.
+
             missing_values = [
                 column
                 for column in REQUIRED_COLUMNS
-                if row.get(column) is None
-                or not str(row[column]).strip()
-                and column != "description"
+                if column != "description"
+                and (
+                    row.get(column) is None
+                    or not str(row[column]).strip()
+                )
             ]
 
             if missing_values:
@@ -167,7 +197,9 @@ async def import_deals_from_csv(
                     + ", ".join(sorted(missing_values))
                 )
 
-            # VALIDATE USING EXISTING DEAL SCHEMA
+            # ==========================================
+            # VALIDATE USING DEAL SCHEMA
+            # ==========================================
 
             deal_data = DealCreate.model_validate({
                 "product_name": row["product_name"],
@@ -179,6 +211,10 @@ async def import_deals_from_csv(
                 "deadline": row["deadline"],
             })
 
+            # ==========================================
+            # VALIDATE BUSINESS RULES
+            # ==========================================
+
             validate_deal_values(
                 normal_price=deal_data.normal_price,
                 group_price=deal_data.group_price,
@@ -187,7 +223,9 @@ async def import_deals_from_csv(
                 deadline=deal_data.deadline
             )
 
+            # ==========================================
             # CREATE DEAL
+            # ==========================================
 
             new_deal = Deal(
                 seller_id=current_user.id,
@@ -200,13 +238,17 @@ async def import_deals_from_csv(
                 deadline=deal_data.deadline,
             )
 
-            # Save each row independently so that
-            # a failed row does not undo valid rows.
+            # Use a savepoint for each valid row.
+
             with db.begin_nested():
                 db.add(new_deal)
                 db.flush()
 
             created_count += 1
+
+        # ==========================================
+        # PYDANTIC VALIDATION ERRORS
+        # ==========================================
 
         except ValidationError as exc:
 
@@ -224,6 +266,25 @@ async def import_deals_from_csv(
                 ],
             })
 
+        # ==========================================
+        # BUSINESS RULE VALIDATION ERRORS
+        # ==========================================
+
+        except HTTPException as exc:
+
+            errors.append({
+                "row": row_number,
+                "errors": [
+                    {
+                        "message": str(exc.detail)
+                    }
+                ],
+            })
+
+        # ==========================================
+        # CSV ROW FORMAT ERRORS
+        # ==========================================
+
         except (ValueError, TypeError) as exc:
 
             errors.append({
@@ -235,7 +296,9 @@ async def import_deals_from_csv(
                 ],
             })
 
+    # ==========================================
     # COMMIT VALID ROWS
+    # ==========================================
 
     try:
 
@@ -245,6 +308,10 @@ async def import_deals_from_csv(
 
         db.rollback()
         raise
+
+    # ==========================================
+    # RETURN IMPORT RESULT
+    # ==========================================
 
     return {
         "message": "CSV import completed",

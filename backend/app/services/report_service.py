@@ -201,14 +201,16 @@ def get_participation_statistics(
 
         promoted_count += deal_promotion_count
 
+    
     return {
         "total_participations": total_participations,
-        "joined_participations": joined_count,
-        "waiting_participations": waiting_count,
-        "cancelled_participations": cancelled_count,
-        "expired_participations": expired_count,
-        "promoted_participations": promoted_count,
+        "joined_count": joined_count,
+        "waiting_count": waiting_count,
+        "cancelled_count": cancelled_count,
+        "expired_count": expired_count,
+        "promoted_count": promoted_count,
     }
+
 
 
 # ==========================================

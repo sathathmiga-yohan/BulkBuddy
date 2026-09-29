@@ -12,6 +12,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.auth.security import require_seller
+from app.models.deal import Deal
 from app.database import Base
 
 # PARTICIPATION STATUS
@@ -115,3 +117,5 @@ class Participation(Base):
         "User",
         back_populates="participations"
     )
+
+

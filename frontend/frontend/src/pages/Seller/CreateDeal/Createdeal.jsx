@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,10 +14,11 @@ import {
 } from "lucide-react";
 
 import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
-import { formatPrice } from "../../../data/mockDeals.js";
-import "./Createdeal.css";
 
-const STORAGE_KEY = "bulkbuddy_seller_created_deals_v1";
+import { createDeal } from "../../../services/dealservice.js";
+import { formatPrice } from "../../../data/mockDeals.js";
+
+import "./Createdeal.css";
 
 const categories = [
   "Electronics",
@@ -42,6 +44,7 @@ const emptyForm = {
 
 function localToday() {
   const date = new Date();
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -49,15 +52,38 @@ function localToday() {
   return `${year}-${month}-${day}`;
 }
 
+function getErrorMessage(error) {
+  const detail = error?.response?.data?.detail;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item.msg || "Invalid input")
+      .join(", ");
+  }
+
+  return "Unable to create deal. Please try again.";
+}
+
 export default function Createdeal() {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+
   const [image, setImage] = useState(null);
   const [imageUrl, setImageUrl] = useState("");
   const [imageError, setImageError] = useState("");
+
   const [preview, setPreview] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  // Image is only used for local preview.
+  // Current Backend DealCreate schema does not accept image uploads.
   useEffect(() => {
     if (!image) {
       setImageUrl("");
@@ -82,6 +108,7 @@ export default function Createdeal() {
     }));
 
     setSuccess(false);
+    setApiError("");
   };
 
   const handleImage = (event) => {
@@ -107,10 +134,6 @@ export default function Createdeal() {
 
     setImage(file);
     setImageError("");
-    setErrors((current) => ({
-      ...current,
-      image: "",
-    }));
     setSuccess(false);
   };
 
@@ -122,32 +145,20 @@ export default function Createdeal() {
     const minimum = Number(form.minimumBuyers);
     const maximum = Number(form.maximumBuyers);
 
-    if (!form.productName.trim()) {
-      next.productName = "Product name is required.";
+    if (form.productName.trim().length < 2) {
+      next.productName =
+        "Product name must contain at least 2 characters.";
     }
 
     if (!form.category) {
       next.category = "Select a category.";
     }
 
-    if (!form.description.trim()) {
-      next.description = "Description is required.";
+    if (!form.originalPrice || !Number.isFinite(original) || original <= 0) {
+      next.originalPrice = "Enter a valid original price.";
     }
 
-    if (
-      !form.originalPrice ||
-      !Number.isFinite(original) ||
-      original <= 0
-    ) {
-      next.originalPrice =
-        "Enter a valid original price.";
-    }
-
-    if (
-      !form.groupPrice ||
-      !Number.isFinite(group) ||
-      group <= 0
-    ) {
+    if (!form.groupPrice || !Number.isFinite(group) || group <= 0) {
       next.groupPrice = "Enter a valid group price.";
     } else if (original > 0 && group >= original) {
       next.groupPrice =
@@ -157,174 +168,126 @@ export default function Createdeal() {
     if (
       !form.minimumBuyers ||
       !Number.isInteger(minimum) ||
-      minimum < 2
+      minimum < 1
     ) {
       next.minimumBuyers =
-        "Minimum buyers must be at least 2.";
+        "Minimum buyers must be at least 1.";
     }
 
     if (
       !form.maximumBuyers ||
       !Number.isInteger(maximum) ||
-      maximum < 2
+      maximum < 1
     ) {
       next.maximumBuyers =
         "Enter a valid maximum buyer count.";
-    } else if (minimum >= 2 && maximum < minimum) {
+    } else if (minimum >= 1 && maximum < minimum) {
       next.maximumBuyers =
         "Maximum buyers must be at least minimum buyers.";
     }
 
-    if (
-      !form.deadline ||
-      form.deadline <= localToday()
-    ) {
-      next.deadline = "Choose a future deadline.";
-    }
+    if (!form.deadline) {
+      next.deadline = "Choose a deadline.";
+    } else {
+      const deadline = new Date(
+        `${form.deadline}T23:59:59`
+      );
 
-    if (!image) {
-      next.image = "Upload a product image.";
+      if (
+        Number.isNaN(deadline.getTime()) ||
+        deadline.getTime() <= Date.now()
+      ) {
+        next.deadline = "Choose a future deadline.";
+      }
     }
 
     if (!form.accepted) {
-      next.accepted =
-        "Please confirm the declaration.";
+      next.accepted = "Please confirm the declaration.";
     }
 
     return next;
   };
 
+  // CREATE DEAL IN BACKEND DATABASE
   const submit = async (event) => {
     event.preventDefault();
 
+    if (saving) return;
+
     const next = validate();
     setErrors(next);
+    setApiError("");
+    setSuccess(false);
 
     if (Object.keys(next).length > 0) {
-      setSuccess(false);
       window.scrollTo({
         top: 0,
         behavior: "smooth",
       });
+
       return;
     }
 
     try {
-      const imageData = await new Promise(
-        (resolve, reject) => {
-          const reader = new FileReader();
+      setSaving(true);
 
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(image);
-        }
-      );
-
-      const stored = JSON.parse(
-        localStorage.getItem(STORAGE_KEY) || "[]"
-      );
-
-      const deals = Array.isArray(stored)
-        ? stored
-        : [];
-
-      const originalPrice = Number(
-        form.originalPrice
-      );
-
-      const groupPrice = Number(
-        form.groupPrice
-      );
-
+      // Convert local selected date to timezone-aware ISO datetime.
       const deadline = new Date(
         `${form.deadline}T23:59:59`
       );
 
-      const discount = Math.round(
-        ((originalPrice - groupPrice) /
-          originalPrice) *
-          100
-      );
-
-      const deal = {
-        id: `seller-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}`,
-
-        name: form.productName.trim(),
-        category: form.category,
-        description: form.description.trim(),
-
-        originalPrice,
-        groupPrice,
-
-        required: Number(form.minimumBuyers),
-        maxQuantity: Number(form.maximumBuyers),
-
-        joined: 0,
-        participants: 0,
-
-        endDate: form.deadline,
-
-        daysLeft: Math.max(
-          0,
-          Math.ceil(
-            (deadline - new Date()) / 86400000
-          )
-        ),
-
-        image: imageData,
-
-        seller: "Demo Seller",
-        rating: 0,
-        discount,
-        status: "active",
+      // Match the exact Backend DealCreate schema.
+      const dealData = {
+        product_name: form.productName.trim(),
+        description: form.description.trim() || null,
+        normal_price: Number(form.originalPrice),
+        group_price: Number(form.groupPrice),
+        minimum_buyers: Number(form.minimumBuyers),
+        maximum_quantity: Number(form.maximumBuyers),
+        deadline: deadline.toISOString(),
       };
 
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify([deal, ...deals])
-      );
-
-      window.dispatchEvent(
-        new Event("bulkbuddy-deals-updated")
-      );
+      await createDeal(dealData);
 
       setSuccess(true);
       setPreview(false);
+
+      // Reset only after successful API response.
+      setForm(emptyForm);
+      setImage(null);
+      setImageError("");
+      setErrors({});
     } catch (error) {
-      console.error(error);
+      console.error("Create deal error:", error);
 
-      setErrors({
-        image:
-          "Could not save locally. Try a smaller image.",
-      });
-
+      setApiError(getErrorMessage(error));
       setSuccess(false);
-    }
+    } finally {
+      setSaving(false);
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    }
   };
 
   const reset = () => {
+    if (saving) return;
+
     setForm(emptyForm);
     setErrors({});
     setImage(null);
     setImageError("");
     setPreview(false);
     setSuccess(false);
+    setApiError("");
   };
 
   const original = Number(form.originalPrice) || 0;
   const group = Number(form.groupPrice) || 0;
 
-  const savings = Math.max(
-    0,
-    original - group
-  );
+  const savings = Math.max(0, original - group);
 
   const discount =
     original > 0
@@ -346,16 +309,12 @@ export default function Createdeal() {
         type={type}
         placeholder={placeholder}
         value={form[name]}
-        min={type === "number" ? "1" : undefined}
-        step={
-          type === "number" ? "any" : undefined
-        }
+        min={type === "number" ? "0.01" : undefined}
+        step={type === "number" ? "any" : undefined}
         onChange={(event) =>
           update(name, event.target.value)
         }
-        className={
-          errors[name] ? "invalid" : ""
-        }
+        className={errors[name] ? "invalid" : ""}
       />
 
       {errors[name] && (
@@ -368,6 +327,7 @@ export default function Createdeal() {
 
   return (
     <SellerLayout title="Create New Deal">
+      {/* PAGE INTRO */}
       <section className="cd-intro">
         <div className="cd-icon">
           <Plus size={24} />
@@ -375,9 +335,9 @@ export default function Createdeal() {
 
         <div>
           <h2>Add a New Group Buying Deal</h2>
+
           <p>
-            Enter product details, pricing and
-            buyer targets.
+            Enter product details, pricing and buyer targets.
           </p>
         </div>
 
@@ -390,23 +350,34 @@ export default function Createdeal() {
         </Link>
       </section>
 
+      {/* SUCCESS MESSAGE */}
       {success && (
-        <div
-          className="cd-success"
-          role="status"
-        >
+        <div className="cd-success" role="status">
           <CheckCircle2 size={22} />
 
           <div>
-            <strong>
-              Deal saved successfully!
-            </strong>
+            <strong>Deal created successfully!</strong>
 
             <p>
-              Your product is now available in
-              Seller Deals and Customer Deals
-              in this browser.
+              Your deal has been saved in the Backend database.
+              You can view it in Seller Deals.
             </p>
+
+            <Link to="/seller/deals">
+              View My Deals
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* BACKEND ERROR */}
+      {apiError && (
+        <div className="cd-success" role="alert">
+          <Info size={22} />
+
+          <div>
+            <strong>Unable to create deal</strong>
+            <p>{apiError}</p>
           </div>
         </div>
       )}
@@ -418,6 +389,7 @@ export default function Createdeal() {
       >
         <div className="cd-grid">
           <div className="cd-column">
+            {/* BASIC INFORMATION */}
             <section className="cd-card">
               <h2>
                 <Package size={20} />
@@ -438,15 +410,10 @@ export default function Createdeal() {
                 <select
                   value={form.category}
                   onChange={(event) =>
-                    update(
-                      "category",
-                      event.target.value
-                    )
+                    update("category", event.target.value)
                   }
                   className={
-                    errors.category
-                      ? "invalid"
-                      : ""
+                    errors.category ? "invalid" : ""
                   }
                 >
                   <option value="">
@@ -468,12 +435,15 @@ export default function Createdeal() {
                     {errors.category}
                   </small>
                 )}
+
+                <small>
+                  Category is shown in this form only.
+                  The current Backend does not save categories.
+                </small>
               </label>
 
               <label className="cd-field">
-                <span>
-                  Description <b>*</b>
-                </span>
+                <span>Description</span>
 
                 <textarea
                   rows={6}
@@ -486,9 +456,7 @@ export default function Createdeal() {
                     )
                   }
                   className={
-                    errors.description
-                      ? "invalid"
-                      : ""
+                    errors.description ? "invalid" : ""
                   }
                 />
 
@@ -500,6 +468,7 @@ export default function Createdeal() {
               </label>
             </section>
 
+            {/* PRICING DETAILS */}
             <section className="cd-card">
               <h2>Pricing Details</h2>
 
@@ -522,15 +491,16 @@ export default function Createdeal() {
               {savings > 0 && group > 0 && (
                 <div className="cd-savings">
                   <CheckCircle2 size={18} />
+
                   Customers save{" "}
-                  {formatPrice(savings)} (
-                  {discount}%)
+                  {formatPrice(savings)} ({discount}%)
                 </div>
               )}
             </section>
           </div>
 
           <div className="cd-column">
+            {/* PRODUCT IMAGE - PREVIEW ONLY */}
             <section className="cd-card">
               <h2>
                 <ImagePlus size={20} />
@@ -560,7 +530,7 @@ export default function Createdeal() {
                   <UploadCloud size={32} />
 
                   <strong>
-                    Click to upload image
+                    Click to preview an image
                   </strong>
 
                   <span>
@@ -580,8 +550,14 @@ export default function Createdeal() {
                   {imageError || errors.image}
                 </small>
               )}
+
+              <small>
+                Image preview only. Image upload is not
+                supported by the current Backend API.
+              </small>
             </section>
 
+            {/* GROUP DEAL SETTINGS */}
             <section className="cd-card">
               <h2>Group Deal Settings</h2>
 
@@ -617,9 +593,7 @@ export default function Createdeal() {
                     )
                   }
                   className={
-                    errors.deadline
-                      ? "invalid"
-                      : ""
+                    errors.deadline ? "invalid" : ""
                   }
                 />
 
@@ -632,12 +606,13 @@ export default function Createdeal() {
 
               <div className="cd-info">
                 <Info size={18} />
-                The group succeeds when its
-                minimum buyer target is reached
-                before the deadline.
+
+                The group succeeds when its minimum buyer
+                target is reached before the deadline.
               </div>
             </section>
 
+            {/* DEAL PREVIEW */}
             <section className="cd-card">
               <h2>Deal Preview</h2>
 
@@ -645,9 +620,7 @@ export default function Createdeal() {
                 type="button"
                 className="cd-preview-button"
                 onClick={() =>
-                  setPreview(
-                    (current) => !current
-                  )
+                  setPreview((current) => !current)
                 }
               >
                 {preview
@@ -665,13 +638,11 @@ export default function Createdeal() {
                   )}
 
                   <h3>
-                    {form.productName ||
-                      "Product Name"}
+                    {form.productName || "Product Name"}
                   </h3>
 
                   <span>
-                    {form.category ||
-                      "Category"}
+                    {form.category || "Category"}
                   </span>
 
                   <strong>
@@ -702,6 +673,7 @@ export default function Createdeal() {
           </div>
         </div>
 
+        {/* DECLARATION AND ACTIONS */}
         <div className="cd-bottom">
           <label className="cd-declaration">
             <input
@@ -715,8 +687,8 @@ export default function Createdeal() {
               }
             />
 
-            I confirm the product information
-            and prices are accurate.
+            I confirm the product information and prices
+            are accurate.
           </label>
 
           {errors.accepted && (
@@ -729,6 +701,7 @@ export default function Createdeal() {
             <button
               type="button"
               onClick={reset}
+              disabled={saving}
             >
               Reset Form
             </button>
@@ -736,9 +709,13 @@ export default function Createdeal() {
             <button
               type="submit"
               className="cd-submit"
+              disabled={saving}
             >
               <Plus size={18} />
-              Create Deal
+
+              {saving
+                ? "Creating Deal..."
+                : "Create Deal"}
             </button>
           </div>
         </div>

@@ -22,8 +22,6 @@ from app.services.notification_service import (
     build_notification_response,
 )
 
-# NOTIFICATIONS ROUTER
-
 router = APIRouter(
     prefix="/notifications",
     tags=["Notifications"]

@@ -22,8 +22,6 @@ class PaymentStatusUpdate(BaseModel):
 
     payment_status: PaymentStatus
 
-# ORDER RESPONSE
-
 class OrderResponse(BaseModel):
 
     id: int

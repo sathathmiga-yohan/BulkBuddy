@@ -1,4 +1,3 @@
-
 from datetime import datetime
 
 from pydantic import (
@@ -10,7 +9,10 @@ from pydantic import (
 
 from app.models.participation import ParticipationStatus
 
+
+# ==========================================
 # JOIN / REJOIN REQUEST
+# ==========================================
 
 class ParticipationJoin(BaseModel):
 
@@ -39,14 +41,22 @@ class ParticipationJoin(BaseModel):
         max_length=20
     )
 
+    # Remove whitespace before length validation.
+
     @field_validator(
         "delivery_name",
         "delivery_phone",
         "delivery_address",
-        "delivery_city"
+        "delivery_city",
+        mode="before"
     )
     @classmethod
-    def validate_required_text(cls, value: str):
+    def validate_required_text(cls, value):
+
+        if not isinstance(value, str):
+            raise ValueError(
+                "This field must be text"
+            )
 
         value = value.strip()
 
@@ -57,16 +67,27 @@ class ParticipationJoin(BaseModel):
 
         return value
 
-    @field_validator("delivery_postal_code")
+    @field_validator(
+        "delivery_postal_code",
+        mode="before"
+    )
     @classmethod
-    def validate_postal_code(cls, value: str | None):
+    def validate_postal_code(cls, value):
 
         if value is None:
             return None
 
+        if not isinstance(value, str):
+            raise ValueError(
+                "Postal code must be text"
+            )
+
         return value.strip() or None
 
+
+# ==========================================
 # PARTICIPATION RESPONSE
+# ==========================================
 
 class ParticipationResponse(BaseModel):
 
@@ -96,7 +117,10 @@ class ParticipationResponse(BaseModel):
         from_attributes=True
     )
 
+
+# ==========================================
 # PARTICIPATION WITH WAITING POSITION
+# ==========================================
 
 class ParticipationDetailResponse(ParticipationResponse):
 

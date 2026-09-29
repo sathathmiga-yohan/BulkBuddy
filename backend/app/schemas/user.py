@@ -23,8 +23,6 @@ class UserCreate(BaseModel):
 
     role: UserRole = UserRole.CUSTOMER
 
-# USER RESPONSE SCHEMA
-
 class UserResponse(BaseModel):
 
     id: int

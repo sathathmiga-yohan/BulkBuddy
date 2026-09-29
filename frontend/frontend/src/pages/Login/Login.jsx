@@ -1,6 +1,7 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { loginUser, getCurrentUser } from "../../services/authservice";
 
 import {
   ArrowRight,
@@ -20,6 +21,9 @@ export default function Login() {
     email: "",
     password: ""
   });
+
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const [showPassword, setShowPassword] =
     useState(false);
@@ -51,7 +55,7 @@ export default function Login() {
     });
   };
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
 
     if (!form.email.trim() || !form.password) {
@@ -59,16 +63,47 @@ export default function Login() {
         type: "error",
         text: "Please enter your email and password."
       });
-
       return;
     }
 
-    setMessage({
-      type: "success",
-      text:
-        "Demo form validated successfully. Real login will be available after backend integration."
-    });
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      // 1. Send credentials to FastAPI
+      const tokenData = await loginUser(
+        form.email.trim(),
+        form.password
+      );
+
+      // 2. Store JWT token
+      localStorage.setItem("token", tokenData.access_token);
+
+      // 3. Fetch logged-in user details
+      const user = await getCurrentUser();
+
+      // 4. Navigate based on role
+      if (user.role === "SELLER") {
+        navigate("/seller/dashboard", { replace: true });
+      } else {
+        navigate("/customer/dashboard", { replace: true });
+      }
+
+    } catch (error) {
+      localStorage.removeItem("token");
+
+      setMessage({
+        type: "error",
+        text:
+          error.response?.data?.detail ||
+          "Login failed. Please check your credentials."
+      });
+    } finally {
+      setLoading(false);
+    }
   };
+
+
 
   const handleForgotPassword = (event) => {
     event.preventDefault();
@@ -249,8 +284,9 @@ export default function Login() {
                   <button
                     type="submit"
                     className="login-submit-button"
+                    disabled={loading}
                   >
-                    Login
+                    {loading ? "Logging in..." : "Login"}
                     <ArrowRight size={18} />
                   </button>
 

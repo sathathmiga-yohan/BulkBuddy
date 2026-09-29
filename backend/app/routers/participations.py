@@ -1,4 +1,3 @@
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -9,9 +8,14 @@ from fastapi import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.security import require_customer
+from app.auth.security import (
+    require_customer,
+    require_seller,
+)
+
 from app.database import get_db
 
+from app.models.deal import Deal
 from app.models.participation import Participation
 from app.models.user import User
 
@@ -27,14 +31,20 @@ from app.services.participation_service import (
     build_participation_response,
 )
 
+
+# ==========================================
 # PARTICIPATION ROUTER
+# ==========================================
 
 router = APIRouter(
     prefix="/participations",
     tags=["Participations"]
 )
 
-# GET MY PARTICIPATIONS
+
+# ==========================================
+# GET MY PARTICIPATIONS - CUSTOMER ONLY
+# ==========================================
 
 @router.get(
     "/my",
@@ -59,7 +69,10 @@ def get_my_participations(
         for participation in participations
     ]
 
+
+# ==========================================
 # GET MY PARTICIPATION FOR A DEAL
+# ==========================================
 
 @router.get(
     "/deals/{deal_id}/mine",
@@ -88,7 +101,10 @@ def get_my_deal_participation(
         participation
     )
 
-# JOIN / REJOIN DEAL
+
+# ==========================================
+# JOIN / REJOIN DEAL - CUSTOMER ONLY
+# ==========================================
 
 @router.post(
     "/{deal_id}/join",
@@ -114,7 +130,10 @@ def join_or_rejoin_deal(
         participation
     )
 
-# LEAVE DEAL
+
+# ==========================================
+# LEAVE DEAL - CUSTOMER ONLY
+# ==========================================
 
 @router.post(
     "/{deal_id}/leave",
@@ -136,3 +155,79 @@ def leave_my_deal(
         db,
         participation
     )
+
+
+# ==========================================
+# GET SELLER DEAL PARTICIPANTS
+# ==========================================
+
+@router.get(
+    "/seller/deals/{deal_id}"
+)
+def get_seller_deal_participants(
+    deal_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_seller),
+):
+
+    # Check whether this deal belongs to the seller.
+
+    deal = db.scalar(
+        select(Deal).where(
+            Deal.id == deal_id,
+            Deal.seller_id == current_user.id
+        )
+    )
+
+    if deal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found or you do not own this deal"
+        )
+
+    # Get all participation records for this deal.
+
+    participations = db.scalars(
+        select(Participation)
+        .where(
+            Participation.deal_id == deal_id
+        )
+        .order_by(
+            Participation.joined_at.asc(),
+            Participation.id.asc()
+        )
+    ).all()
+
+    result = []
+
+    for participation in participations:
+
+        customer = participation.customer
+
+        result.append({
+            "id": participation.id,
+            "deal_id": participation.deal_id,
+            "customer_id": participation.customer_id,
+
+            "customer_name": customer.name,
+            "customer_email": customer.email,
+
+            "status": participation.status.value,
+
+            "delivery_name": participation.delivery_name,
+            "delivery_phone": participation.delivery_phone,
+            "delivery_address": participation.delivery_address,
+            "delivery_city": participation.delivery_city,
+            "delivery_postal_code": participation.delivery_postal_code,
+
+            "joined_at": participation.joined_at,
+            "updated_at": participation.updated_at,
+        })
+
+    return {
+        "deal_id": deal.id,
+        "product_name": deal.product_name,
+        "minimum_buyers": deal.minimum_buyers,
+        "maximum_quantity": deal.maximum_quantity,
+        "participants": result,
+    }

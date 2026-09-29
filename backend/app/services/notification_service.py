@@ -33,8 +33,6 @@ def create_notification(
 
     db.add(notification)
 
-    # Do not commit here.
-    # The calling service controls the transaction.
     db.flush()
 
     return notification

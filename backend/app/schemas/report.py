@@ -15,8 +15,6 @@ class DealPerformanceResponse(BaseModel):
 
     failed_deals: int = 0
 
-# PARTICIPATION STATISTICS
-
 class ParticipationStatisticsResponse(BaseModel):
 
     total_participations: int = 0

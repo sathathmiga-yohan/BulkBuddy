@@ -1,8 +1,6 @@
-
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     status,
 )
 
@@ -30,14 +28,20 @@ from app.services.deal_service import (
     validate_deal_deletion,
 )
 
+
+# ==========================================
 # DEALS ROUTER
+# ==========================================
 
 router = APIRouter(
     prefix="/deals",
     tags=["Deals"]
 )
 
+
+# ==========================================
 # GET ALL DEALS - PUBLIC
+# ==========================================
 
 @router.get(
     "",
@@ -59,7 +63,10 @@ def get_all_deals(
         for deal in deals
     ]
 
+
+# ==========================================
 # GET SELLER'S OWN DEALS
+# ==========================================
 
 @router.get(
     "/seller/my-deals",
@@ -84,7 +91,10 @@ def get_my_deals(
         for deal in deals
     ]
 
+
+# ==========================================
 # GET DEAL BY ID - PUBLIC
+# ==========================================
 
 @router.get(
     "/{deal_id}",
@@ -105,7 +115,10 @@ def get_deal_by_id(
         deal
     )
 
+
+# ==========================================
 # CREATE DEAL - SELLER ONLY
+# ==========================================
 
 @router.post(
     "",
@@ -146,7 +159,10 @@ def create_deal(
         new_deal
     )
 
+
+# ==========================================
 # UPDATE DEAL - OWNER ONLY
+# ==========================================
 
 @router.patch(
     "/{deal_id}",
@@ -186,7 +202,10 @@ def update_deal(
         deal
     )
 
+
+# ==========================================
 # DELETE DEAL - OWNER ONLY
+# ==========================================
 
 @router.delete(
     "/{deal_id}",

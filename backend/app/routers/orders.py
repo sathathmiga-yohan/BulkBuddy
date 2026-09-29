@@ -223,7 +223,6 @@ def change_payment_status(
         db.rollback()
         raise
 
-# CANCEL ORDER
 # CUSTOMER ONLY
 
 @router.patch(

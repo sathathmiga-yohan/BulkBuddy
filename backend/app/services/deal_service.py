@@ -189,18 +189,27 @@ def validate_deal_update(
     )
 
     if participation_exists is not None:
-        for field in restricted_fields:
-            if (
-                field in changes
-                and changes[field] != getattr(deal, field)
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "Price, capacity and deadline cannot "
-                        "be changed after participation exists"
-                    )
+
+    for field in restricted_fields:
+
+        if field not in changes:
+            continue
+
+        old_value = getattr(deal, field)
+        new_value = changes[field]
+
+        if field == "deadline":
+            old_value = normalize_datetime(old_value)
+            new_value = normalize_datetime(new_value)
+
+        if new_value != old_value:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Price, capacity and deadline cannot "
+                    "be changed after participation exists"
                 )
+            )
 
     # Validate the final combined values, not just
     # individual fields in a partial PATCH request.

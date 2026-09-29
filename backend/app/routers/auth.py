@@ -51,7 +51,6 @@ def register(
             detail="Admin registration is not allowed"
         )
 
-    # Check duplicate email
     existing_user = db.scalar(
         select(User).where(
             User.email == user_data.email

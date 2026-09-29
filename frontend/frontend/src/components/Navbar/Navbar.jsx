@@ -1,8 +1,10 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 import {
   Link,
   NavLink,
+  useLocation,
   useNavigate
 } from "react-router-dom";
 
@@ -15,6 +17,11 @@ import {
   ArrowRight
 } from "lucide-react";
 
+import {
+  getCurrentUser,
+  logoutUser
+} from "../../services/authservice";
+
 import "./Navbar.css";
 
 const navLinks = [
@@ -26,13 +33,77 @@ const navLinks = [
 
 function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // ==========================================
+  // CHECK LOGGED-IN USER
+  // ==========================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCurrentUser = async () => {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        setCurrentUser(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      setAuthLoading(true);
+
+      try {
+        const user = await getCurrentUser();
+
+        if (!cancelled) {
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          logoutUser();
+          setCurrentUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    loadCurrentUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname]);
+
+  // ==========================================
+  // DASHBOARD PATH
+  // ==========================================
+
+  const dashboardPath =
+    currentUser?.role === "SELLER"
+      ? "/seller/dashboard"
+      : "/customer/dashboard";
+
+  // ==========================================
+  // CLOSE MOBILE MENU
+  // ==========================================
+
   const closeMenu = () => {
     setMenuOpen(false);
   };
+
+  // ==========================================
+  // SEARCH DEALS
+  // ==========================================
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -48,9 +119,21 @@ function Navbar() {
     closeMenu();
   };
 
+  // ==========================================
+  // LOGOUT
+  // ==========================================
+
+  const handleLogout = () => {
+    logoutUser();
+
+    setCurrentUser(null);
+    setMenuOpen(false);
+
+    navigate("/", { replace: true });
+  };
+
   return (
     <header className="navbar">
-
       <div className="navbar-container">
 
         {/* BULKBUDDY LOGO */}
@@ -129,28 +212,62 @@ function Navbar() {
 
         <div className="navbar-actions">
 
-          <Link
-            to="/login"
-            className="navbar-cart"
-            aria-label="Login to access your account"
-            title="Login to access your account"
-          >
-            <ShoppingCart size={20} />
-          </Link>
+          {!authLoading && (
+            currentUser ? (
+              <>
+                <Link
+                  to={dashboardPath}
+                  className="navbar-cart"
+                  aria-label="Go to dashboard"
+                  title="Go to dashboard"
+                >
+                  <ShoppingCart size={20} />
+                </Link>
 
-          <Link
-            to="/login"
-            className="navbar-login"
-          >
-            Login
-          </Link>
+                <Link
+                  to={dashboardPath}
+                  className="navbar-login"
+                >
+                  {currentUser.role === "SELLER"
+                    ? "Seller Dashboard"
+                    : "My Dashboard"}
+                </Link>
 
-          <Link
-            to="/register"
-            className="navbar-signup"
-          >
-            Sign Up
-          </Link>
+                <button
+                  type="button"
+                  className="navbar-signup"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="navbar-cart"
+                  aria-label="Login to access your account"
+                  title="Login to access your account"
+                >
+                  <ShoppingCart size={20} />
+                </Link>
+
+                <Link
+                  to="/login"
+                  className="navbar-login"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  className="navbar-signup"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )
+          )}
 
         </div>
 
@@ -160,7 +277,8 @@ function Navbar() {
           type="button"
           className="navbar-menu-button"
           onClick={() =>
-            setMenuOpen((previous) => !previous)
+            setMenuOpen((previous) => !previous
+            )
           }
           aria-label={
             menuOpen ? "Close menu" : "Open menu"
@@ -224,21 +342,47 @@ function Navbar() {
 
           <div className="navbar-mobile-actions">
 
-            <Link
-              to="/login"
-              onClick={closeMenu}
-              className="navbar-mobile-login"
-            >
-              Login
-            </Link>
+            {!authLoading && (
+              currentUser ? (
+                <>
+                  <Link
+                    to={dashboardPath}
+                    onClick={closeMenu}
+                    className="navbar-mobile-login"
+                  >
+                    {currentUser.role === "SELLER"
+                      ? "Seller Dashboard"
+                      : "My Dashboard"}
+                  </Link>
 
-            <Link
-              to="/register"
-              onClick={closeMenu}
-              className="navbar-mobile-signup"
-            >
-              Sign Up
-            </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="navbar-mobile-signup"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    onClick={closeMenu}
+                    className="navbar-mobile-login"
+                  >
+                    Login
+                  </Link>
+
+                  <Link
+                    to="/register"
+                    onClick={closeMenu}
+                    className="navbar-mobile-signup"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )
+            )}
 
           </div>
 

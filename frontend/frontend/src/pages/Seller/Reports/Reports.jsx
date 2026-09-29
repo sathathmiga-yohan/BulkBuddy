@@ -1,43 +1,93 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
 import {
-  BarChart3, CheckCircle2, Clock3,
-  Download, FileSpreadsheet, Search,
-  TrendingUp, Users, XCircle
+  BarChart3,
+  CheckCircle2,
+  Clock3,
+  Download,
+  FileSpreadsheet,
+  Search,
+  TrendingUp,
+  Users,
+  XCircle,
 } from "lucide-react";
+
 import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
-import { sellerDeals } from "../sellerMockData.js";
+
 import { formatPrice } from "../../../data/mockDeals.js";
+
+import { getSellerReport } from "../../../services/reportservice.js";
+
+import {
+  getSellerDeals,
+  getSellerDealParticipants,
+} from "../../../services/dealservice.js";
+
 import "./Reports.css";
+
+// ==========================================
+// HELPERS
+// ==========================================
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-CA");
+}
+
+function getErrorMessage(error) {
+  const detail = error?.response?.data?.detail;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  return "Unable to load seller reports. Please try again.";
+}
 
 function downloadCSV(rows, filename) {
   const headers = [
     "Deal ID",
     "Deal Name",
-    "Category",
     "Group Price (LKR)",
-    "Participants",
-    "Required Buyers",
+    "Joined Buyers",
+    "Waiting Buyers",
+    "Minimum Buyers",
+    "Maximum Quantity",
     "Status",
-    "End Date"
+    "Deadline",
   ];
 
-  const values = rows.map(deal => [
+  const values = rows.map((deal) => [
     deal.id,
-    deal.name,
-    deal.category,
-    deal.groupPrice,
-    deal.participants,
-    deal.required,
+    deal.product_name,
+    deal.group_price,
+    deal.joined_count,
+    deal.waiting_count,
+    deal.minimum_buyers,
+    deal.maximum_quantity,
     deal.status,
-    deal.endDate
+    deal.deadline,
   ]);
 
-  const escapeCell = value =>
-    `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const escapeCell = (value) => {
+    const safeValue = String(value ?? "").replace(
+      /^[\s]*([=+\-@])/,
+      "'$1"
+    );
+
+    return `"${safeValue.replace(/"/g, '""')}"`;
+  };
 
   const csv = [headers, ...values]
-    .map(row => row.map(escapeCell).join(","))
+    .map((row) => row.map(escapeCell).join(","))
     .join("\r\n");
 
   const blob = new Blob(
@@ -47,72 +97,195 @@ function downloadCSV(rows, filename) {
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+
   link.href = url;
   link.download = filename;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  URL.revokeObjectURL(url);
 }
 
+// ==========================================
+// REPORTS COMPONENT
+// ==========================================
+
 export default function Reports() {
+  const [deals, setDeals] = useState([]);
+  const [report, setReport] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const invalidRange =
-    Boolean(startDate && endDate && startDate > endDate);
+  // ==========================================
+  // LOAD BACKEND REPORTS
+  // ==========================================
+
+  useEffect(() => {
+    let active = true;
+
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [reportData, sellerDealsData] =
+          await Promise.all([
+            getSellerReport(),
+            getSellerDeals(),
+          ]);
+
+        const sellerDeals = Array.isArray(sellerDealsData)
+          ? sellerDealsData
+          : [];
+
+        // Load actual participants for each seller deal.
+        const dealsWithCounts = await Promise.all(
+          sellerDeals.map(async (deal) => {
+            const participationData =
+              await getSellerDealParticipants(deal.id);
+
+            const participants = Array.isArray(
+              participationData?.participants
+            )
+              ? participationData.participants
+              : [];
+
+            const joinedCount = participants.filter(
+              (participant) =>
+                participant.status === "JOINED"
+            ).length;
+
+            const waitingCount = participants.filter(
+              (participant) =>
+                participant.status === "WAITING"
+            ).length;
+
+            return {
+              ...deal,
+              joined_count: joinedCount,
+              waiting_count: waitingCount,
+            };
+          })
+        );
+
+        if (!active) return;
+
+        setReport(reportData);
+        setDeals(dealsWithCounts);
+      } catch (err) {
+        if (!active) return;
+
+        setError(getErrorMessage(err));
+        setReport(null);
+        setDeals([]);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadReports();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // ==========================================
+  // FILTERS
+  // ==========================================
+
+  const invalidRange = Boolean(
+    startDate && endDate && startDate > endDate
+  );
 
   const filtered = useMemo(() => {
     if (invalidRange) return [];
 
-    return sellerDeals.filter(deal => {
-      const matchesSearch =
-        `${deal.name} ${deal.category}`
-          .toLowerCase()
-          .includes(search.toLowerCase());
+    const query = search.trim().toLowerCase();
+
+    return deals.filter((deal) => {
+      const matchesSearch = String(
+        deal.product_name ?? ""
+      )
+        .toLowerCase()
+        .includes(query);
 
       const matchesStatus =
-        status === "all" || deal.status === status;
+        status === "all" ||
+        String(deal.status).toLowerCase() === status;
+
+      const deadline = deal.deadline
+        ? new Date(deal.deadline)
+        : null;
+
+      const deadlineDate =
+        deadline && !Number.isNaN(deadline.getTime())
+          ? [
+              deadline.getFullYear(),
+              String(deadline.getMonth() + 1).padStart(2, "0"),
+              String(deadline.getDate()).padStart(2, "0"),
+            ].join("-")
+          : "";
 
       const matchesStart =
-        !startDate || deal.endDate >= startDate;
+        !startDate || deadlineDate >= startDate;
 
       const matchesEnd =
-        !endDate || deal.endDate <= endDate;
+        !endDate || deadlineDate <= endDate;
 
-      return matchesSearch &&
+      return (
+        matchesSearch &&
         matchesStatus &&
         matchesStart &&
-        matchesEnd;
+        matchesEnd
+      );
     });
-  }, [search, status, startDate, endDate, invalidRange]);
+  }, [
+    deals,
+    search,
+    status,
+    startDate,
+    endDate,
+    invalidRange,
+  ]);
+
+  // ==========================================
+  // FILTERED STATISTICS
+  // ==========================================
 
   const totalParticipants = filtered.reduce(
-    (sum, deal) => sum + deal.participants,
+    (sum, deal) => sum + deal.joined_count,
     0
   );
 
   const successful = filtered.filter(
-    deal => deal.status === "successful"
+    (deal) => deal.status === "SUCCESSFUL"
   ).length;
 
   const active = filtered.filter(
-    deal => deal.status === "active"
+    (deal) => deal.status === "ACTIVE"
   ).length;
 
   const failed = filtered.filter(
-    deal => deal.status === "failed"
+    (deal) => deal.status === "FAILED"
   ).length;
 
-  // Estimated value based on joined buyers in this demo.
-  // This is not verified revenue or received payment.
-  const estimatedValue = filtered.reduce(
-    (sum, deal) =>
-      sum + deal.groupPrice * deal.participants,
-    0
+  // Backend sales summary.
+  // This is seller-wide, not affected by table filters.
+  const salesSummary = report?.sales_summary;
+
+  const totalSalesValue = Number(
+    salesSummary?.total_sales_value ?? 0
   );
 
   const resetFilters = () => {
@@ -122,12 +295,19 @@ export default function Reports() {
     setEndDate("");
   };
 
+  // ==========================================
+  // UI
+  // ==========================================
+
   return (
     <SellerLayout title="Reports">
+      {/* INTRO */}
       <section className="sr-intro">
         <div>
           <small>SELLER ANALYTICS</small>
+
           <h2>Deal Performance Reports</h2>
+
           <p>
             Explore your group deals, filter results
             and export a CSV report.
@@ -137,7 +317,11 @@ export default function Reports() {
         <button
           type="button"
           className="sr-download"
-          disabled={filtered.length === 0 || invalidRange}
+          disabled={
+            loading ||
+            filtered.length === 0 ||
+            invalidRange
+          }
           onClick={() =>
             downloadCSV(
               filtered,
@@ -150,69 +334,101 @@ export default function Reports() {
         </button>
       </section>
 
+      {/* LOADING / ERROR */}
+      {loading && (
+        <p className="sr-disclaimer">
+          Loading real seller reports...
+        </p>
+      )}
+
+      {error && (
+        <p className="sr-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {/* STATISTICS */}
       <section className="sr-stats">
         {[
           {
             title: "Filtered Deals",
             value: filtered.length,
-            icon: BarChart3
+            icon: BarChart3,
           },
           {
             title: "Successful Deals",
             value: successful,
-            icon: CheckCircle2
+            icon: CheckCircle2,
           },
           {
-            title: "Total Participants",
+            title: "Joined Participants",
             value: totalParticipants,
-            icon: Users
+            icon: Users,
           },
           {
-            title: "Estimated Deal Value",
-            value: formatPrice(estimatedValue),
-            icon: TrendingUp
-          }
-        ].map(item => {
+            title: "Total COD Sales Value",
+            value: report
+              ? formatPrice(totalSalesValue)
+              : "—",
+            icon: TrendingUp,
+          },
+        ].map((item) => {
           const Icon = item.icon;
+
           return (
-            <article className="sr-stat" key={item.title}>
+            <article
+              className="sr-stat"
+              key={item.title}
+            >
               <div className="sr-stat-icon">
                 <Icon size={22} />
               </div>
+
               <span>{item.title}</span>
-              <strong>{item.value}</strong>
+
+              <strong>
+                {loading ? "—" : item.value}
+              </strong>
             </article>
           );
         })}
       </section>
 
+      {/* FILTER REPORTS */}
       <section className="sr-panel">
         <div className="sr-panel-heading">
           <div>
             <h2>Filter Reports</h2>
-            <p>Dates refer to the deal end date.</p>
+            <p>Dates refer to the deal deadline.</p>
           </div>
         </div>
 
         <div className="sr-filters">
           <label>
             Search Deal
+
             <div className="sr-search">
               <Search size={17} />
+
               <input
                 type="search"
                 placeholder="Search product..."
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
               />
             </div>
           </label>
 
           <label>
             Status
+
             <select
               value={status}
-              onChange={event => setStatus(event.target.value)}
+              onChange={(event) =>
+                setStatus(event.target.value)
+              }
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -223,21 +439,27 @@ export default function Reports() {
 
           <label>
             From Date
+
             <input
               type="date"
               value={startDate}
               max={endDate || undefined}
-              onChange={event => setStartDate(event.target.value)}
+              onChange={(event) =>
+                setStartDate(event.target.value)
+              }
             />
           </label>
 
           <label>
             To Date
+
             <input
               type="date"
               value={endDate}
               min={startDate || undefined}
-              onChange={event => setEndDate(event.target.value)}
+              onChange={(event) =>
+                setEndDate(event.target.value)
+              }
             />
           </label>
 
@@ -257,19 +479,25 @@ export default function Reports() {
         )}
       </section>
 
+      {/* DEAL REPORT TABLE */}
       <section className="sr-panel">
         <div className="sr-panel-heading">
           <div>
             <h2>Deal Reports</h2>
+
             <p>
-              Showing {filtered.length} of {sellerDeals.length} demo deals
+              Showing {filtered.length} of {deals.length} deals
             </p>
           </div>
 
           <button
             type="button"
             className="sr-export-secondary"
-            disabled={filtered.length === 0 || invalidRange}
+            disabled={
+              loading ||
+              filtered.length === 0 ||
+              invalidRange
+            }
             onClick={() =>
               downloadCSV(
                 filtered,
@@ -287,7 +515,7 @@ export default function Reports() {
             <thead>
               <tr>
                 <th>Deal Name</th>
-                <th>Category</th>
+                <th>Deal ID</th>
                 <th>Group Price</th>
                 <th>Buyers</th>
                 <th>Progress</th>
@@ -297,50 +525,80 @@ export default function Reports() {
             </thead>
 
             <tbody>
-              {filtered.map(deal => {
-                const progress = Math.min(
-                  Math.round(
-                    deal.participants / deal.required * 100
-                  ),
-                  100
-                );
+              {filtered.map((deal) => {
+                const progress =
+                  deal.minimum_buyers > 0
+                    ? Math.min(
+                        Math.round(
+                          (deal.joined_count /
+                            deal.minimum_buyers) *
+                            100
+                        ),
+                        100
+                      )
+                    : 0;
 
                 return (
                   <tr key={deal.id}>
                     <td>
-                      <strong>{deal.name}</strong>
+                      <strong>
+                        {deal.product_name}
+                      </strong>
                     </td>
-                    <td>{deal.category}</td>
+
+                    <td>#{deal.id}</td>
+
                     <td className="sr-price">
-                      {formatPrice(deal.groupPrice)}
+                      {formatPrice(
+                        Number(deal.group_price)
+                      )}
                     </td>
+
                     <td>
-                      {deal.participants}/{deal.required}
+                      {deal.joined_count}/
+                      {deal.minimum_buyers}
                     </td>
+
                     <td>
                       <div className="sr-progress-label">
                         {progress}%
                       </div>
+
                       <div className="sr-progress">
                         <span
-                          style={{ width: `${progress}%` }}
+                          style={{
+                            width: `${progress}%`,
+                          }}
                         />
                       </div>
                     </td>
+
                     <td>
-                      <span className={`sr-status ${deal.status}`}>
+                      <span
+                        className={`sr-status ${String(
+                          deal.status
+                        ).toLowerCase()}`}
+                      >
                         {deal.status}
                       </span>
                     </td>
-                    <td>{deal.endDate}</td>
+
+                    <td>
+                      {formatDate(deal.deadline)}
+                    </td>
                   </tr>
                 );
               })}
 
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="sr-empty">
-                    No matching reports found.
+                  <td
+                    colSpan={7}
+                    className="sr-empty"
+                  >
+                    {loading
+                      ? "Loading deal reports..."
+                      : "No matching reports found."}
                   </td>
                 </tr>
               )}
@@ -349,17 +607,20 @@ export default function Reports() {
         </div>
       </section>
 
+      {/* SUMMARY */}
       <section className="sr-summary">
         <div>
           <Clock3 size={19} />
           <span>Active</span>
           <strong>{active}</strong>
         </div>
+
         <div>
           <CheckCircle2 size={19} />
           <span>Successful</span>
           <strong>{successful}</strong>
         </div>
+
         <div>
           <XCircle size={19} />
           <span>Failed</span>
@@ -368,10 +629,12 @@ export default function Reports() {
       </section>
 
       <p className="sr-disclaimer">
-        All figures are mock data. Estimated Deal Value
-        is calculated from group price multiplied by
-        participant count; it does not represent
-        confirmed revenue or payments.
+        Deal statistics use real seller deals and
+        participation records. COD sales value comes
+        from the seller report API and is not the same
+        as received payment. The COD sales summary
+        covers all seller deals, while table filters
+        affect only the deal statistics shown above.
       </p>
     </SellerLayout>
   );

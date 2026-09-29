@@ -209,7 +209,6 @@ def process_expired_deals() -> dict:
                 elif deal.status == DealStatus.FAILED:
                     failed += 1
 
-                # db.refresh() may open a new transaction.
                 db.rollback()
 
             except Exception as exc:

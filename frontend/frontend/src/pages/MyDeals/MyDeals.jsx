@@ -1,214 +1,480 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
 import {
-  ArrowRight, CheckCircle2, Clock3, Heart,
-  LogOut, Package, Settings, ShoppingBag,
-  UserRound, Users, XCircle
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  LogOut,
+  Package,
+  ShoppingBag,
+  UserRound,
+  XCircle,
 } from "lucide-react";
-import { mockDeals, formatPrice } from "../../data/mockDeals.js";
+
+import { formatPrice } from "../../data/mockDeals.js";
+
+import { getCurrentUser, logoutUser } from "../../services/authservice";import { getDealById } from "../../services/dealservice";
+import { getMyParticipations } from "../../services/participationservice";
+
 import "./MyDeals.css";
 
-const joinedDeals = [
-  { dealId: 1, status: "active", quantity: 1, date: "2026-09-25" },
-  { dealId: 2, status: "active", quantity: 1, date: "2026-09-24" },
-  { dealId: 4, status: "successful", quantity: 2, date: "2026-09-15" },
-  { dealId: 6, status: "failed", quantity: 1, date: "2026-09-10" }
+const filters = [
+  "all",
+  "active",
+  "waiting",
+  "successful",
+  "failed",
+  "cancelled",
 ];
 
-const filters = ["all", "active", "successful", "failed"];
+function getErrorMessage(error, fallback) {
+  const detail = error?.response?.data?.detail;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  return fallback;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString();
+}
+
+function getDealStatus(item) {
+  const participationStatus = String(
+    item.status || ""
+  ).toUpperCase();
+
+  const dealStatus = String(
+    item.deal?.status || ""
+  ).toUpperCase();
+
+  if (participationStatus === "CANCELLED") {
+    return "cancelled";
+  }
+
+  if (participationStatus === "WAITING") {
+    return "waiting";
+  }
+
+  if (dealStatus === "SUCCESSFUL") {
+    return "successful";
+  }
+
+  if (dealStatus === "FAILED") {
+    return "failed";
+  }
+
+  return "active";
+}
 
 export default function MyDeals() {
+  const navigate = useNavigate();
+
   const [page, setPage] = useState("deals");
   const [filter, setFilter] = useState("all");
-  const [profile, setProfile] = useState({
-    name: "Demo Customer",
-    email: "customer@example.com",
-    phone: ""
-  });
-  const [saved, setSaved] = useState(false);
-  const [emailUpdates, setEmailUpdates] = useState(true);
-  const [dealUpdates, setDealUpdates] = useState(true);
 
-  const visibleDeals = joinedDeals.filter(
-    item => filter === "all" || item.status === filter
-  );
+  const [profile, setProfile] = useState(null);
+  const [joinedDeals, setJoinedDeals] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [user, participations] = await Promise.all([
+          getCurrentUser(),
+          getMyParticipations(),
+        ]);
+
+        const dealsWithDetails = await Promise.all(
+          participations.map(async (participation) => {
+            try {
+              const deal = await getDealById(
+                participation.deal_id
+              );
+
+              return {
+                ...participation,
+                deal,
+              };
+            } catch (dealError) {
+              console.error(
+                `Unable to load deal ${participation.deal_id}:`,
+                dealError
+              );
+
+              return {
+                ...participation,
+                deal: null,
+              };
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setProfile(user);
+          setJoinedDeals(dealsWithDetails);
+        }
+      } catch (err) {
+        console.error("Dashboard loading error:", err);
+
+        if (!cancelled) {
+          setError(
+            getErrorMessage(
+              err,
+              "Unable to load your dashboard."
+            )
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visibleDeals = joinedDeals.filter((item) => {
+    return (
+      filter === "all" ||
+      getDealStatus(item) === filter
+    );
+  });
 
   const counts = {
     all: joinedDeals.length,
-    active: joinedDeals.filter(d => d.status === "active").length,
-    successful: joinedDeals.filter(d => d.status === "successful").length,
-    failed: joinedDeals.filter(d => d.status === "failed").length
+
+    active: joinedDeals.filter(
+      (item) => getDealStatus(item) === "active"
+    ).length,
+
+    waiting: joinedDeals.filter(
+      (item) => getDealStatus(item) === "waiting"
+    ).length,
+
+    successful: joinedDeals.filter(
+      (item) => getDealStatus(item) === "successful"
+    ).length,
+
+    failed: joinedDeals.filter(
+      (item) => getDealStatus(item) === "failed"
+    ).length,
+
+    cancelled: joinedDeals.filter(
+      (item) => getDealStatus(item) === "cancelled"
+    ).length,
   };
 
-  const updateProfile = event => {
-    setProfile(current => ({
-      ...current,
-      [event.target.name]: event.target.value
-    }));
-    setSaved(false);
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
   };
 
   return (
     <main className="mydeals-page">
       <div className="mydeals-layout">
+        {/* SIDEBAR */}
         <aside className="mydeals-sidebar">
           <div className="mydeals-user">
             <div className="mydeals-avatar">
               <UserRound size={27} />
             </div>
-            <strong>{profile.name}</strong>
+
+            <strong>
+              {profile?.name || "Customer"}
+            </strong>
+
             <span>Customer Account</span>
           </div>
 
           <nav className="mydeals-navigation">
             <button
-              className={page === "deals" ? "active" : ""}
+              type="button"
+              className={
+                page === "deals" ? "active" : ""
+              }
               onClick={() => setPage("deals")}
             >
-              <Package size={18} /> My Deals
+              <Package size={18} />
+              My Deals
             </button>
+
             <button
-              className={page === "profile" ? "active" : ""}
+              type="button"
+              className={
+                page === "profile" ? "active" : ""
+              }
               onClick={() => setPage("profile")}
             >
-              <UserRound size={18} /> My Profile
-            </button>
-            <button
-              className={page === "settings" ? "active" : ""}
-              onClick={() => setPage("settings")}
-            >
-              <Settings size={18} /> Settings
+              <UserRound size={18} />
+              My Profile
             </button>
           </nav>
 
           <div className="mydeals-sidebar-bottom">
             <Link to="/deals">
-              <ShoppingBag size={18} /> Explore Deals
+              <ShoppingBag size={18} />
+              Explore Deals
             </Link>
-            <Link to="/login">
-              <LogOut size={18} /> Logout (Demo)
-            </Link>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+            >
+              <LogOut size={18} />
+              Logout
+            </button>
           </div>
         </aside>
 
+        {/* MAIN CONTENT */}
         <section className="mydeals-main">
-          {page === "deals" && (
+          {loading && (
+            <section className="mydeals-panel" role="status">
+              <p>Loading your dashboard...</p>
+            </section>
+          )}
+
+          {error && (
+            <section className="mydeals-panel" role="alert">
+              <h2>Unable to load dashboard</h2>
+              <p>{error}</p>
+            </section>
+          )}
+
+          {!loading && !error && page === "deals" && (
             <>
+              {/* HEADER */}
               <header className="mydeals-header">
                 <div>
                   <small>CUSTOMER DASHBOARD</small>
+
                   <h1>My Deals</h1>
-                  <p>Track all your group purchases.</p>
+
+                  <p>
+                    Track all your group buying
+                    participations.
+                  </p>
                 </div>
-                <Link className="mydeals-primary" to="/deals">
-                  Explore Deals <ArrowRight size={17} />
+
+                <Link
+                  className="mydeals-primary"
+                  to="/deals"
+                >
+                  Explore Deals
+                  <ArrowRight size={17} />
                 </Link>
               </header>
 
+              {/* STATISTICS */}
               <div className="mydeals-stats">
                 {[
-                  { key: "all", title: "Total Joined", icon: ShoppingBag },
-                  { key: "active", title: "Active Deals", icon: Clock3 },
-                  { key: "successful", title: "Successful", icon: CheckCircle2 },
-                  { key: "failed", title: "Failed Deals", icon: XCircle }
-                ].map(item => {
+                  {
+                    key: "all",
+                    title: "Total Participations",
+                    icon: ShoppingBag,
+                  },
+                  {
+                    key: "active",
+                    title: "Active Deals",
+                    icon: Clock3,
+                  },
+                  {
+                    key: "successful",
+                    title: "Successful",
+                    icon: CheckCircle2,
+                  },
+                  {
+                    key: "failed",
+                    title: "Failed Deals",
+                    icon: XCircle,
+                  },
+                ].map((item) => {
                   const Icon = item.icon;
+
                   return (
-                    <div className="mydeals-stat" key={item.key}>
-                      <div className={`mydeals-stat-icon ${item.key}`}>
+                    <div
+                      className="mydeals-stat"
+                      key={item.key}
+                    >
+                      <div
+                        className={`mydeals-stat-icon ${item.key}`}
+                      >
                         <Icon size={22} />
                       </div>
+
                       <span>{item.title}</span>
-                      <strong>{counts[item.key]}</strong>
+
+                      <strong>
+                        {counts[item.key]}
+                      </strong>
                     </div>
                   );
                 })}
               </div>
 
+              {/* JOINED DEALS */}
               <section className="mydeals-panel">
                 <div className="mydeals-panel-title">
-                  <h2>Joined Group Deals</h2>
-                  <span>{visibleDeals.length} deals</span>
+                  <h2>My Group Deals</h2>
+
+                  <span>
+                    {visibleDeals.length} deals
+                  </span>
                 </div>
 
+                {/* FILTERS */}
                 <div className="mydeals-filters">
-                  {filters.map(value => (
+                  {filters.map((value) => (
                     <button
                       key={value}
-                      className={filter === value ? "active" : ""}
+                      type="button"
+                      className={
+                        filter === value
+                          ? "active"
+                          : ""
+                      }
                       onClick={() => setFilter(value)}
                     >
                       {value === "all"
                         ? "All Deals"
-                        : value[0].toUpperCase() + value.slice(1)}
+                        : value[0].toUpperCase() +
+                          value.slice(1)}
                     </button>
                   ))}
                 </div>
 
+                {/* DEAL CARDS */}
                 <div className="mydeals-list">
-                  {visibleDeals.map(item => {
-                    const deal = mockDeals.find(d => d.id === item.dealId);
-                    if (!deal) return null;
+                  {visibleDeals.map((item) => {
+                    const deal = item.deal;
+                    const status = getDealStatus(item);
 
-                    const progress = Math.min(
-                      100,
-                      Math.round(deal.joined / deal.required * 100)
-                    );
+                    const groupPrice = deal
+                      ? Number(deal.group_price)
+                      : null;
 
                     return (
-                      <article className="mydeals-card" key={item.dealId}>
-                        <img src={deal.image} alt={deal.name} />
+                      <article
+                        className="mydeals-card"
+                        key={item.id}
+                      >
                         <div className="mydeals-card-body">
                           <div className="mydeals-card-top">
-                            <span>{deal.category}</span>
-                            <span className={`mydeals-status ${item.status}`}>
-                              {item.status}
+                            <span>
+                              Deal #{item.deal_id}
+                            </span>
+
+                            <span
+                              className={`mydeals-status ${status}`}
+                            >
+                              {status}
                             </span>
                           </div>
 
-                          <h3>{deal.name}</h3>
-                          <p>Joined: {item.date}</p>
+                          <h3>
+                            {deal?.product_name ||
+                              `Deal #${item.deal_id}`}
+                          </h3>
+
+                          <p>
+                            Joined:{" "}
+                            {formatDate(item.joined_at)}
+                          </p>
 
                           <div className="mydeals-prices">
                             <div>
-                              <small>Group Price</small>
-                              <strong>{formatPrice(deal.groupPrice)}</strong>
-                            </div>
-                            <div>
-                              <small>Quantity</small>
-                              <strong>{item.quantity}</strong>
-                            </div>
-                            <div>
-                              <small>Your Total</small>
+                              <small>
+                                Group Price
+                              </small>
+
                               <strong>
-                                {formatPrice(deal.groupPrice * item.quantity)}
+                                {groupPrice !== null
+                                  ? formatPrice(groupPrice)
+                                  : "Unavailable"}
                               </strong>
                             </div>
+
+                            <div>
+                              <small>
+                                Participation
+                              </small>
+
+                              <strong>
+                                {String(item.status)}
+                              </strong>
+                            </div>
+
+                            {item.waiting_position != null && (
+                              <div>
+                                <small>
+                                  Waiting Position
+                                </small>
+
+                                <strong>
+                                  {item.waiting_position}
+                                </strong>
+                              </div>
+                            )}
                           </div>
 
-                          <div className="mydeals-progress-label">
-                            <span>
-                              <Users size={14} />
-                              {deal.joined}/{deal.required} buyers
-                            </span>
-                            <strong>{progress}%</strong>
-                          </div>
+                          {deal && (
+                            <div className="mydeals-progress-label">
+                              <span>
+                                <Package size={14} />
 
-                          <div className="mydeals-progress">
-                            <span style={{ width: `${progress}%` }} />
-                          </div>
+                                Minimum{" "}
+                                {deal.minimum_buyers}{" "}
+                                buyers
+                              </span>
+
+                              <strong>
+                                Capacity{" "}
+                                {deal.maximum_quantity}
+                              </strong>
+                            </div>
+                          )}
 
                           <div className="mydeals-card-footer">
                             <span>
-                              {item.status === "active"
-                                ? `${deal.daysLeft} days left`
-                                : item.status === "successful"
-                                  ? "Group target achieved"
-                                  : "Group target not achieved"}
+                              {status === "active"
+                                ? "Participation active"
+                                : status === "waiting"
+                                ? "On waiting list"
+                                : status === "successful"
+                                ? "Deal successful"
+                                : status === "failed"
+                                ? "Deal failed"
+                                : "Participation cancelled"}
                             </span>
-                            <Link to={`/deals/${deal.id}`}>
-                              View Details <ArrowRight size={15} />
+
+                            <Link
+                              to={`/deals/${item.deal_id}`}
+                            >
+                              View Details
+                              <ArrowRight size={15} />
                             </Link>
                           </div>
                         </div>
@@ -219,8 +485,18 @@ export default function MyDeals() {
                   {visibleDeals.length === 0 && (
                     <div className="mydeals-empty">
                       <Package size={35} />
+
                       <h3>No deals found</h3>
-                      <p>No deals available for this filter.</p>
+
+                      <p>
+                        No participations available
+                        for this filter.
+                      </p>
+
+                      <Link to="/deals">
+                        Explore Deals
+                        <ArrowRight size={15} />
+                      </Link>
                     </div>
                   )}
                 </div>
@@ -228,92 +504,58 @@ export default function MyDeals() {
             </>
           )}
 
-          {page === "profile" && (
+          {/* PROFILE - READ ONLY UNTIL UPDATE API EXISTS */}
+          {!loading && !error && page === "profile" && (
             <>
               <header className="mydeals-header">
                 <div>
                   <small>CUSTOMER DASHBOARD</small>
+
                   <h1>My Profile</h1>
-                  <p>Update your personal details.</p>
+
+                  <p>
+                    Your registered account information.
+                  </p>
                 </div>
               </header>
 
               <section className="mydeals-panel mydeals-form-panel">
                 <h2>Personal Information</h2>
-                <p>Changes are saved in this demo page only.</p>
 
-                <form onSubmit={event => {
-                  event.preventDefault();
-                  setSaved(true);
-                }}>
-                  {[
-                    { name: "name", label: "Full Name", type: "text" },
-                    { name: "email", label: "Email", type: "email" },
-                    { name: "phone", label: "Phone Number", type: "tel" }
-                  ].map(field => (
-                    <label key={field.name}>
-                      {field.label}
-                      <input
-                        name={field.name}
-                        type={field.type}
-                        value={profile[field.name]}
-                        onChange={updateProfile}
-                        required={field.name !== "phone"}
-                      />
-                    </label>
-                  ))}
+                <label>
+                  Full Name
 
-                  <button className="mydeals-primary" type="submit">
-                    Save Changes
-                  </button>
-                  {saved && (
-                    <p className="mydeals-saved">
-                      <CheckCircle2 size={17} />
-                      Profile updated in this demo.
-                    </p>
-                  )}
-                </form>
-              </section>
-            </>
-          )}
-
-          {page === "settings" && (
-            <>
-              <header className="mydeals-header">
-                <div>
-                  <small>CUSTOMER DASHBOARD</small>
-                  <h1>Settings</h1>
-                  <p>Manage your demo notification preferences.</p>
-                </div>
-              </header>
-
-              <section className="mydeals-panel mydeals-form-panel">
-                <h2>Notification Preferences</h2>
-                <p>Actual notifications require backend integration.</p>
-
-                <label className="mydeals-setting">
-                  <span>
-                    <strong>Email Notifications</strong>
-                    <small>Receive email updates.</small>
-                  </span>
                   <input
-                    type="checkbox"
-                    checked={emailUpdates}
-                    onChange={event => setEmailUpdates(event.target.checked)}
+                    type="text"
+                    value={profile?.name || ""}
+                    readOnly
                   />
                 </label>
 
-                <label className="mydeals-setting">
-                  <span>
-                    <strong>Deal Notifications</strong>
-                    <small>Receive updates about joined deals.</small>
-                  </span>
+                <label>
+                  Email
+
                   <input
-                    type="checkbox"
-                    checked={dealUpdates}
-                    onChange={event => setDealUpdates(event.target.checked)}
+                    type="email"
+                    value={profile?.email || ""}
+                    readOnly
                   />
                 </label>
+
+                <label>
+                  Account Role
+
+                  <input
+                    type="text"
+                    value={profile?.role || "CUSTOMER"}
+                    readOnly
+                  />
+                </label>
+
+                <p>
+                  Profile editing is not available
+                  through the current Backend API.
+                </p>
               </section>
             </>
           )}

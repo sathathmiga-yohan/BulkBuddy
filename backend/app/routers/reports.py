@@ -20,7 +20,7 @@ router = APIRouter(
     tags=["Reports"]
 )
 
-# GET COMPLETE SELLER REPORT
+# GET COMPLETE SELLER 
 
 @router.get(
     "/seller",

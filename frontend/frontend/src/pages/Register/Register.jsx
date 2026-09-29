@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -15,6 +14,8 @@ import {
   Users,
   Sparkles
 } from "lucide-react";
+
+import { registerUser } from "../../services/authservice";
 
 import "./Register.css";
 
@@ -36,6 +37,7 @@ export default function Register() {
 
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const updateField = (name, value) => {
     setForm((current) => ({
@@ -92,7 +94,7 @@ export default function Register() {
     return newErrors;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const validationErrors = validateForm();
@@ -103,45 +105,35 @@ export default function Register() {
       return;
     }
 
-    // FRONTEND DEMO:
-    // Save only non-sensitive profile information.
-    // Real registration will use the FastAPI backend.
-    const demoUser = {
-      fullName: form.fullName.trim(),
-      email: form.email.trim().toLowerCase(),
-      role: form.role
-    };
+    setLoading(true);
+    setSuccess(false);
 
     try {
-      sessionStorage.setItem(
-        "bulkbuddy_demo_user",
-        JSON.stringify(demoUser)
-      );
+      await registerUser({
+        name: form.fullName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role: form.role.toUpperCase()
+      });
 
       setSuccess(true);
 
-      // Navigate according to the selected account type.
-      if (form.role === "seller") {
-        navigate("/seller/dashboard", {
-          replace: true
-        });
-      } else {
-        navigate("/customer/dashboard", {
-          replace: true
-        });
-      }
-    } catch (error) {
-      console.error(
-        "Demo registration failed:",
-        error
-      );
+      // Registration does not return a JWT.
+      // Sign in using the new account.
+      navigate("/login", { replace: true });
 
-      setSuccess(false);
+    } catch (error) {
+      const detail = error.response?.data?.detail;
 
       setErrors({
         general:
-          "Unable to continue. Please try again."
+          typeof detail === "string"
+            ? detail
+            : "Registration failed. Please try again."
       });
+
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -185,11 +177,11 @@ export default function Register() {
 
                 <div>
                   <strong>
-                    Demo registration successful!
+                    Account created successfully!
                   </strong>
 
                   <p>
-                    Redirecting to your dashboard...
+                    Redirecting to Login...
                   </p>
                 </div>
               </div>
@@ -505,8 +497,12 @@ export default function Register() {
               <button
                 type="submit"
                 className="register-submit-button"
+                disabled={loading}
               >
-                Create Account
+                {loading
+                  ? "Creating Account..."
+                  : "Create Account"}
+
                 <ArrowRight size={18} />
               </button>
 

@@ -139,8 +139,6 @@ def require_seller(
 
     return current_user
 
-# REQUIRE ADMIN
-
 def require_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:

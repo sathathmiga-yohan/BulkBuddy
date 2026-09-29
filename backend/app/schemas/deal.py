@@ -143,8 +143,6 @@ class DealUpdate(BaseModel):
 
         return value
 
-# DEAL RESPONSE
-
 class DealResponse(DealBase):
 
     id: int

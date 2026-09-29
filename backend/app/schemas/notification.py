@@ -3,7 +3,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-# NOTIFICATION RESPONSE
 
 class NotificationResponse(BaseModel):
 
