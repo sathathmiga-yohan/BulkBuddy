@@ -250,21 +250,6 @@ export default function Dealparticipants() {
     });
   }, [participants, search, statusFilter]);
 
-
-  const joinedParticipants = participants.filter(
-    (participant) => participant.status === "JOINED"
-  );
-
-  const waitingParticipants = participants
-    .filter(
-      (participant) => participant.status === "WAITING"
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.joined_at) - new Date(b.joined_at) ||
-        a.id - b.id
-    );
-
   const joinedCount = participants.filter(
     (participant) => participant.status === "JOINED"
   ).length;
@@ -492,7 +477,7 @@ export default function Dealparticipants() {
           </section>
 
           {/* ACTIVE PARTICIPANTS */}
-
+{/* 
           <section className="sdp-panel">
 
             <div className="sdp-table-heading">
@@ -618,13 +603,13 @@ export default function Dealparticipants() {
 
             </div>
 
-          </section>
+          </section> */}
 
           {/* WAITING LIST */}
-
+{/* 
           <section className="sdp-panel">
 
-            <div className="sdp-table-heading">
+            <div className="sdp-tabl e-heading">
               <div>
                 <h2>Waiting List</h2>
 
@@ -747,8 +732,8 @@ export default function Dealparticipants() {
 
             </div>
 
-          </section>
-          
+          </section> */}
+
           {/* PARTICIPANTS TABLE */}
           <section className="sdp-panel">
             <div className="sdp-table-heading">
