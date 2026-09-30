@@ -317,6 +317,7 @@ def build_deal_response(
     return {
         "id": deal.id,
         "seller_id": deal.seller_id,
+        "participant_count": get_participant_count(db, deal.id),
         "product_name": deal.product_name,
         "description": deal.description,
         "normal_price": deal.normal_price,

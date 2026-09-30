@@ -151,6 +151,8 @@ class DealResponse(DealBase):
 
     status: DealStatus
 
+    participant_count: int   
+
     created_at: datetime
 
     updated_at: datetime
