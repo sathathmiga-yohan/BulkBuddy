@@ -338,7 +338,8 @@
   gap: 7px;
 }
 
-.sdeals-actions button {
+.sdeals-actions button,
+.sdeals-actions .participants {
   display: grid;
   place-items: center;
   width: 32px;
@@ -346,11 +347,17 @@
   border: none;
   border-radius: 7px;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .sdeals-actions .view {
   background: #eee7ff;
   color: #6034d9;
+}
+
+.sdeals-actions .participants {
+  background: #e8f7f0;
+  color: #1c9a59;
 }
 
 .sdeals-actions .edit {

@@ -250,6 +250,21 @@ export default function Dealparticipants() {
     });
   }, [participants, search, statusFilter]);
 
+
+  const joinedParticipants = participants.filter(
+    (participant) => participant.status === "JOINED"
+  );
+
+  const waitingParticipants = participants
+    .filter(
+      (participant) => participant.status === "WAITING"
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.joined_at) - new Date(b.joined_at) ||
+        a.id - b.id
+    );
+
   const joinedCount = participants.filter(
     (participant) => participant.status === "JOINED"
   ).length;
@@ -476,6 +491,264 @@ export default function Dealparticipants() {
             })}
           </section>
 
+          {/* ACTIVE PARTICIPANTS */}
+
+          <section className="sdp-panel">
+
+            <div className="sdp-table-heading">
+              <div>
+                <h2>Active Participants</h2>
+
+                <p>
+                  Customers currently confirmed in this deal.
+                </p>
+              </div>
+            </div>
+
+            <div className="sdp-table-wrapper">
+
+              <table className="sdp-table">
+
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                    <th>Joined Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+
+                  {joinedParticipants.map((participant) => (
+
+                    <tr key={participant.id}>
+
+                      <td>
+                        <div className="sdp-person">
+
+                          <div className="sdp-avatar">
+                            {String(
+                              participant.customer_name || "?"
+                            )
+                              .split(" ")
+                              .filter(Boolean)
+                              .map((part) => part[0])
+                              .slice(0, 2)
+                              .join("")
+                              .toUpperCase()}
+                          </div>
+
+                          <div>
+                            <strong>
+                              {participant.customer_name}
+                            </strong>
+
+                            <span>
+                              {participant.customer_email}
+                            </span>
+                          </div>
+
+                        </div>
+                      </td>
+
+                      <td>
+                        {participant.delivery_phone || "—"}
+                      </td>
+
+                      <td>
+                        {participant.delivery_city || "—"}
+                      </td>
+
+                      <td>
+                        {formatDate(participant.joined_at)}
+                      </td>
+
+                      <td>
+                        <span className="sdp-status joined">
+                          JOINED
+                        </span>
+                      </td>
+
+                      <td>
+                        <button
+                          type="button"
+                          className="sdp-view"
+                          onClick={() =>
+                            setSelectedParticipant(participant)
+                          }
+                        >
+                          <Eye size={16} />
+                          View
+                        </button>
+                      </td>
+
+                    </tr>
+
+                  ))}
+
+                  {!loadingParticipants &&
+                    joinedParticipants.length === 0 && (
+
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="sdp-empty"
+                        >
+                          <Users size={30} />
+
+                          <strong>
+                            No active participants yet
+                          </strong>
+
+                          <span>
+                            Customers who join this deal will
+                            appear here.
+                          </span>
+                        </td>
+                      </tr>
+
+                    )}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </section>
+
+          {/* WAITING LIST */}
+
+          <section className="sdp-panel">
+
+            <div className="sdp-table-heading">
+              <div>
+                <h2>Waiting List</h2>
+
+                <p>
+                  Customers waiting for an available slot.
+                </p>
+              </div>
+            </div>
+
+            <div className="sdp-table-wrapper">
+
+              <table className="sdp-table">
+
+                <thead>
+                  <tr>
+                    <th>Position</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                    <th>Waiting Since</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+
+                  {waitingParticipants.map(
+                    (participant, index) => (
+
+                      <tr key={participant.id}>
+
+                        <td>
+                          <strong>#{index + 1}</strong>
+                        </td>
+
+                        <td>
+                          <div className="sdp-person">
+
+                            <div className="sdp-avatar">
+                              {String(
+                                participant.customer_name || "?"
+                              )
+                                .split(" ")
+                                .filter(Boolean)
+                                .map((part) => part[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <strong>
+                                {participant.customer_name}
+                              </strong>
+
+                              <span>
+                                {participant.customer_email}
+                              </span>
+                            </div>
+
+                          </div>
+                        </td>
+
+                        <td>
+                          {participant.delivery_phone || "—"}
+                        </td>
+
+                        <td>
+                          {participant.delivery_city || "—"}
+                        </td>
+
+                        <td>
+                          {formatDate(participant.joined_at)}
+                        </td>
+
+                        <td>
+                          <button
+                            type="button"
+                            className="sdp-view"
+                            onClick={() =>
+                              setSelectedParticipant(participant)
+                            }
+                          >
+                            <Eye size={16} />
+                            View
+                          </button>
+                        </td>
+
+                      </tr>
+
+                    )
+                  )}
+
+                  {!loadingParticipants &&
+                    waitingParticipants.length === 0 && (
+
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="sdp-empty"
+                        >
+                          <Clock3 size={30} />
+
+                          <strong>
+                            Waiting list is empty
+                          </strong>
+
+                          <span>
+                            Customers will appear here when
+                            this deal reaches maximum capacity.
+                          </span>
+                        </td>
+                      </tr>
+
+                    )}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          </section>
+          
           {/* PARTICIPANTS TABLE */}
           <section className="sdp-panel">
             <div className="sdp-table-heading">

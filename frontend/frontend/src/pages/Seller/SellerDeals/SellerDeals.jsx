@@ -497,6 +497,16 @@ export default function SellerDeals() {
                               <Eye size={17} />
                             </button>
 
+                            {/* VIEW PARTICIPANTS */}
+                            <Link
+                              to={`/seller/participants?dealId=${deal.id}`}
+                              className="participants"
+                              title="View Participants"
+                              aria-label={`View participants for ${deal.product_name}`}
+                            >
+                              <Users size={17} />
+                            </Link>
+
                             <button
                               type="button"
                               className="edit"
