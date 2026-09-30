@@ -24,11 +24,10 @@ export const getSellerDeals = async () => {
     return response.data;
 };
 
-// Seller: Update own deal
 export const updateDeal = async (dealId, dealData) => {
     const response = await api.patch(
         `/deals/${dealId}`,
-        dealData
+        dealDatawwwww
     );
 
     return response.data;

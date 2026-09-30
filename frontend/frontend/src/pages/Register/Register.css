@@ -1,5 +1,7 @@
 
-/* REGISTER PAGE */
+/* ==========================================
+   REGISTER PAGE
+========================================== */
 
 .register-page {
   min-height: calc(100vh - 70px);
@@ -12,7 +14,9 @@
   min-height: calc(100vh - 70px);
 }
 
-/* LEFT SIDE */
+/* ==========================================
+   LEFT SIDE
+========================================== */
 
 .register-form-side {
   display: flex;
@@ -33,11 +37,16 @@
   color: #81778e;
   font-size: 12px;
   font-weight: 600;
+  text-decoration: none;
 }
 
 .register-back-home:hover {
   color: #6034d9;
 }
+
+/* ==========================================
+   HEADING
+========================================== */
 
 .register-heading {
   margin-bottom: 26px;
@@ -69,7 +78,9 @@
   line-height: 1.8;
 }
 
-/* FORM */
+/* ==========================================
+   REGISTRATION FORM
+========================================== */
 
 .register-form {
   display: flex;
@@ -89,7 +100,9 @@
   font-weight: 700;
 }
 
-/* CUSTOMER / SELLER */
+/* ==========================================
+   CUSTOMER / SELLER SELECTION
+========================================== */
 
 .register-role-grid {
   display: grid;
@@ -108,6 +121,7 @@
   border-radius: 10px;
   background: #ffffff;
   text-align: left;
+  cursor: pointer;
   transition: 0.2s;
 }
 
@@ -148,7 +162,9 @@
   line-height: 1.5;
 }
 
-/* INPUTS */
+/* ==========================================
+   INPUT FIELDS
+========================================== */
 
 .register-input-wrap {
   display: flex;
@@ -187,6 +203,10 @@
   color: #aaa0b4;
 }
 
+/* ==========================================
+   SHOW / HIDE PASSWORD
+========================================== */
+
 .register-eye-button {
   display: flex;
   align-items: center;
@@ -195,11 +215,16 @@
   border: none;
   background: transparent;
   color: #92869f;
+  cursor: pointer;
 }
 
 .register-eye-button:hover {
   color: #6034d9;
 }
+
+/* ==========================================
+   VALIDATION ERRORS
+========================================== */
 
 .register-error {
   color: #d52f61;
@@ -212,7 +237,23 @@
   font-size: 10px;
 }
 
-/* TERMS */
+/* General Backend Error */
+
+.register-form-container > .register-error {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #f3c2ce;
+  border-radius: 8px;
+  background: #fff1f4;
+  color: #c62855;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* ==========================================
+   TERMS AND CONDITIONS
+========================================== */
 
 .register-terms {
   display: flex;
@@ -238,7 +279,9 @@
   accent-color: #6034d9;
 }
 
-/* SUBMIT */
+/* ==========================================
+   CREATE ACCOUNT BUTTON
+========================================== */
 
 .register-submit-button {
   display: flex;
@@ -254,13 +297,24 @@
   color: #ffffff;
   font-size: 13px;
   font-weight: 800;
+  cursor: pointer;
   transition: 0.2s;
 }
 
-.register-submit-button:hover {
+.register-submit-button:hover:not(:disabled) {
   background: #4823b8;
   transform: translateY(-1px);
 }
+
+.register-submit-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ==========================================
+   LOGIN LINK
+========================================== */
 
 .register-login-text {
   margin-top: 23px;
@@ -272,13 +326,16 @@
 .register-login-text a {
   color: #6034d9;
   font-weight: 800;
+  text-decoration: none;
 }
 
 .register-login-text a:hover {
   text-decoration: underline;
 }
 
-/* SUCCESS MESSAGE */
+/* ==========================================
+   SUCCESS MESSAGE
+========================================== */
 
 .register-success {
   display: flex;
@@ -306,7 +363,9 @@
   line-height: 1.6;
 }
 
-/* RIGHT SIDE */
+/* ==========================================
+   RIGHT SIDE: SHOPPING VISUAL
+========================================== */
 
 .register-visual-side {
   position: relative;
@@ -419,7 +478,9 @@
   color: #ffc3e0;
 }
 
-/* RESPONSIVE */
+/* ==========================================
+   RESPONSIVE: TABLET
+========================================== */
 
 @media (max-width: 900px) {
   .register-layout {
@@ -434,6 +495,10 @@
     padding: 35px 25px;
   }
 }
+
+/* ==========================================
+   RESPONSIVE: MOBILE
+========================================== */
 
 @media (max-width: 700px) {
   .register-layout {
@@ -453,6 +518,10 @@
     display: none;
   }
 }
+
+/* ==========================================
+   RESPONSIVE: SMALL MOBILE
+========================================== */
 
 @media (max-width: 380px) {
   .register-role-grid {

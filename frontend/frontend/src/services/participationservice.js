@@ -16,7 +16,6 @@ export const getMyDealParticipation = async (dealId) => {
   return response.data;
 };
 
-// Customer: Join or rejoin a deal
 export const joinDeal = async (dealId, joinData) => {
   const response = await api.post(
     `/participations/${dealId}/join`,

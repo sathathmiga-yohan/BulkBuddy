@@ -149,30 +149,38 @@ export default function Reports() {
         // Load actual participants for each seller deal.
         const dealsWithCounts = await Promise.all(
           sellerDeals.map(async (deal) => {
-            const participationData =
-              await getSellerDealParticipants(deal.id);
+            try {
+              const participationData =
+                await getSellerDealParticipants(deal.id);
 
-            const participants = Array.isArray(
-              participationData?.participants
-            )
-              ? participationData.participants
-              : [];
+              const participants = Array.isArray(
+                participationData?.participants
+              )
+                ? participationData.participants
+                : [];
 
-            const joinedCount = participants.filter(
-              (participant) =>
-                participant.status === "JOINED"
-            ).length;
+              return {
+                ...deal,
+                joined_count: participants.filter(
+                  (participant) => participant.status === "JOINED"
+                ).length,
 
-            const waitingCount = participants.filter(
-              (participant) =>
-                participant.status === "WAITING"
-            ).length;
+                waiting_count: participants.filter(
+                  (participant) => participant.status === "WAITING"
+                ).length,
+              };
+            } catch (error) {
+              console.error(
+                `Unable to load participants for deal ${deal.id}`,
+                error
+              );
 
-            return {
-              ...deal,
-              joined_count: joinedCount,
-              waiting_count: waitingCount,
-            };
+              return {
+                ...deal,
+                joined_count: null,
+                waiting_count: null,
+              };
+            }
           })
         );
 
@@ -231,10 +239,10 @@ export default function Reports() {
       const deadlineDate =
         deadline && !Number.isNaN(deadline.getTime())
           ? [
-              deadline.getFullYear(),
-              String(deadline.getMonth() + 1).padStart(2, "0"),
-              String(deadline.getDate()).padStart(2, "0"),
-            ].join("-")
+            deadline.getFullYear(),
+            String(deadline.getMonth() + 1).padStart(2, "0"),
+            String(deadline.getDate()).padStart(2, "0"),
+          ].join("-")
           : "";
 
       const matchesStart =
@@ -263,10 +271,14 @@ export default function Reports() {
   // FILTERED STATISTICS
   // ==========================================
 
-  const totalParticipants = filtered.reduce(
-    (sum, deal) => sum + deal.joined_count,
-    0
-  );
+  const totalParticipants = filtered.some(
+    (deal) => deal.joined_count === null
+  )
+    ? null
+    : filtered.reduce(
+      (sum, deal) => sum + deal.joined_count,
+      0
+    );
 
   const successful = filtered.filter(
     (deal) => deal.status === "SUCCESSFUL"
@@ -362,7 +374,7 @@ export default function Reports() {
           },
           {
             title: "Joined Participants",
-            value: totalParticipants,
+            value: totalParticipants ?? "—",
             icon: Users,
           },
           {
@@ -527,16 +539,16 @@ export default function Reports() {
             <tbody>
               {filtered.map((deal) => {
                 const progress =
-                  deal.minimum_buyers > 0
-                    ? Math.min(
+                  deal.joined_count === null
+                    ? null
+                    : deal.minimum_buyers > 0
+                      ? Math.min(
                         Math.round(
-                          (deal.joined_count /
-                            deal.minimum_buyers) *
-                            100
+                          (deal.joined_count / deal.minimum_buyers) * 100
                         ),
                         100
                       )
-                    : 0;
+                      : 0;
 
                 return (
                   <tr key={deal.id}>
@@ -555,19 +567,18 @@ export default function Reports() {
                     </td>
 
                     <td>
-                      {deal.joined_count}/
+                      {deal.joined_count ?? "—"}/
                       {deal.minimum_buyers}
                     </td>
 
                     <td>
                       <div className="sr-progress-label">
-                        {progress}%
-                      </div>
+                        {progress === null ? "—" : `${progress}%`}                      </div>
 
                       <div className="sr-progress">
                         <span
                           style={{
-                            width: `${progress}%`,
+                            width: `${progress ?? 0}%`,
                           }}
                         />
                       </div>

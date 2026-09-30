@@ -20,6 +20,7 @@ import SellerLayout from "../SellerDashboard/SellerLayout.jsx";
 
 import {
   getSellerDeals,
+  getSellerDealParticipants,
   updateDeal,
   deleteDeal,
 } from "../../../services/dealservice.js";
@@ -86,6 +87,7 @@ function createEditForm(deal) {
 
 export default function SellerDeals() {
   const [deals, setDeals] = useState([]);
+  const [participantCounts, setParticipantCounts] = useState({});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -98,14 +100,47 @@ export default function SellerDeals() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+
   const loadDeals = async () => {
     try {
       setLoading(true);
       setError("");
 
+      // Get seller's own deals
       const data = await getSellerDeals();
 
-      setDeals(Array.isArray(data) ? data : []);
+      const sellerDeals = Array.isArray(data) ? data : [];
+
+      setDeals(sellerDeals);
+
+      // Get actual participants for each deal
+      const results = await Promise.allSettled(
+        sellerDeals.map(async (deal) => {
+          const response = await getSellerDealParticipants(deal.id);
+
+          // Count only JOINED customers
+          const joinedCount = (response.participants || []).filter(
+            (participant) =>
+              String(participant.status).toUpperCase() === "JOINED"
+          ).length;
+
+          return {
+            dealId: deal.id,
+            count: joinedCount,
+          };
+        })
+      );
+
+      const newCounts = {};
+
+      results.forEach((result) => {
+        if (result.status === "fulfilled") {
+          newCounts[result.value.dealId] = result.value.count;
+        }
+      });
+
+      setParticipantCounts(newCounts);
+
     } catch (err) {
       setError(
         getErrorMessage(err, "Unable to load your deals.")
@@ -404,13 +439,37 @@ export default function SellerDeals() {
                         <td>
                           <span className="sdeals-buyers">
                             <Users size={15} />
-                            — / {deal.minimum_buyers}
-                          </span>
+                            {participantCounts[deal.id] ?? "—"} / {deal.minimum_buyers}                          </span>
                         </td>
 
                         {/* PROGRESS */}
+                        {/* PROGRESS */}
                         <td>
-                          <span className="sdeals-percent">—</span>
+                          {participantCounts[deal.id] === undefined ? (
+                            <span className="sdeals-percent">—</span>
+                          ) : (
+                            <>
+                              <span className="sdeals-percent">
+                                {Math.min(
+                                  Math.round(
+                                    (participantCounts[deal.id] / deal.minimum_buyers) * 100
+                                  ),
+                                  100
+                                )}%
+                              </span>
+
+                              <div className="sdeals-progress">
+                                <span
+                                  style={{
+                                    width: `${Math.min(
+                                      (participantCounts[deal.id] / deal.minimum_buyers) * 100,
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </>
+                          )}
                         </td>
 
                         {/* STATUS */}

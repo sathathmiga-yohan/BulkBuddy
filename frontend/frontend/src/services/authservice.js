@@ -9,7 +9,6 @@ export const registerUser = async (userData) => {
   return response.data;
 };
 
-// ==========================================
 // LOGIN USER
 // ==========================================
 export const loginUser = async (email, password) => {

@@ -370,3 +370,27 @@
     width: 100%;
   }
 }
+
+
+.cd-api-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 21px;
+  padding: 17px;
+  border: 1px solid #f5c6d9;
+  border-radius: 8px;
+  background: #fff0f6;
+  color: #d52f61;
+  font-size: 11px;
+}
+
+.cd-api-error strong {
+  font-size: 13px;
+}
+
+.cd-api-error p {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+}

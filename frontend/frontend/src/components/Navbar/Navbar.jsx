@@ -67,10 +67,16 @@ function Navbar() {
         }
       } catch (error) {
         if (!cancelled) {
-          logoutUser();
+          if (error.response?.status === 401) {
+            logoutUser();
+          }
+
           setCurrentUser(null);
         }
-      } finally {
+      }
+
+
+      finally {
         if (!cancelled) {
           setAuthLoading(false);
         }
@@ -331,8 +337,7 @@ function Navbar() {
               end={item.path === "/"}
               onClick={closeMenu}
               className={({ isActive }) =>
-                `navbar-mobile-link ${
-                  isActive ? "active" : ""
+                `navbar-mobile-link ${isActive ? "active" : ""
                 }`
               }
             >

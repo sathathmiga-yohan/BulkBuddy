@@ -268,17 +268,18 @@ export default function Dealparticipants() {
 
   const progress = selectedDeal?.minimum_buyers
     ? Math.min(
-        Math.round(
-          (joinedCount / selectedDeal.minimum_buyers) * 100
-        ),
-        100
-      )
+      Math.round(
+        (joinedCount / selectedDeal.minimum_buyers) * 100
+      ),
+      100
+    )
     : 0;
 
   const changeDeal = (event) => {
     const nextId = event.target.value;
 
     setSelectedDealId(nextId);
+    setParticipants([]);
     setSearch("");
     setStatusFilter("ALL");
     setSelectedParticipant(null);
@@ -560,7 +561,7 @@ export default function Dealparticipants() {
                             <div className="sdp-avatar">
                               {String(
                                 participant.customer_name ||
-                                  "?"
+                                "?"
                               )
                                 .split(" ")
                                 .filter(Boolean)
@@ -685,7 +686,7 @@ export default function Dealparticipants() {
                 <div className="sdp-avatar">
                   {String(
                     selectedParticipant.customer_name ||
-                      "?"
+                    "?"
                   )
                     .split(" ")
                     .filter(Boolean)

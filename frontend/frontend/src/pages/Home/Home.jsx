@@ -1,122 +1,147 @@
 
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
   ArrowRight,
   Users,
   ShieldCheck,
-  Truck,
   BadgePercent,
   Clock3,
   ShoppingBag,
-  Star
+  Package,
+  Info,
 } from "lucide-react";
 
+import { getDeals } from "../../services/dealservice";
+
 import "./Home.css";
+
+
+// ==========================================
+// DEFAULT PRODUCT IMAGE
+// ==========================================
+
+const DEFAULT_IMAGE =
+  "https://placehold.co/600x400?text=BulkBuddy";
+
+
+// ==========================================
+// HOME BENEFITS
+// ==========================================
 
 const benefits = [
   {
     icon: Users,
     title: "Group Buying",
     description:
-      "Join other shoppers and unlock better prices together."
+      "Join other shoppers and unlock better prices together.",
   },
   {
     icon: BadgePercent,
     title: "Big Savings",
     description:
-      "Enjoy exclusive discounts on your favourite products."
+      "Enjoy group prices on available deals.",
   },
   {
     icon: ShieldCheck,
-    title: "Trusted Sellers",
+    title: "Seller Accounts",
     description:
-      "Shop confidently with our trusted marketplace sellers."
+      "Browse group deals created by registered sellers.",
   },
   {
-    icon: Truck,
-    title: "Easy Delivery",
+    icon: Package,
+    title: "Track Your Deals",
     description:
-      "Get your group purchases delivered to your doorstep."
-  }
+      "Check your joined deals and their progress from your dashboard.",
+  },
 ];
 
-const trendingDeals = [
-  {
-    id: 1,
-    name: "Premium Wireless Headphones",
-    category: "Electronics",
-    image:
-      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=700&q=85",
-    originalPrice: 18000,
-    groupPrice: 12999,
-    joined: 16,
-    required: 20,
-    daysLeft: 3,
-    rating: 4.8,
-    discount: 28
-  },
-  {
-    id: 2,
-    name: "Smart Watch Series Pro",
-    category: "Accessories",
-    image:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=700&q=85",
-    originalPrice: 25000,
-    groupPrice: 18999,
-    joined: 12,
-    required: 15,
-    daysLeft: 5,
-    rating: 4.9,
-    discount: 24
-  },
-  {
-    id: 3,
-    name: "Professional DSLR Camera",
-    category: "Electronics",
-    image:
-      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=700&q=85",
-    originalPrice: 150000,
-    groupPrice: 119999,
-    joined: 7,
-    required: 10,
-    daysLeft: 2,
-    rating: 4.7,
-    discount: 20
-  },
-  {
-    id: 4,
-    name: "Modern Running Sneakers",
-    category: "Fashion",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=700&q=85",
-    originalPrice: 16000,
-    groupPrice: 10999,
-    joined: 18,
-    required: 25,
-    daysLeft: 4,
-    rating: 4.8,
-    discount: 31
-  }
-];
+
+// ==========================================
+// FORMAT PRICE
+// ==========================================
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("en-LK", {
     style: "currency",
     currency: "LKR",
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(amount);
 
+
+// ==========================================
+// CONVERT BACKEND DEAL DATA
+// ==========================================
+
+function mapBackendDeal(deal) {
+  const originalPrice = Number(deal.normal_price);
+  const groupPrice = Number(deal.group_price);
+
+  const deadline = new Date(deal.deadline);
+
+  const remaining =
+    deadline.getTime() - Date.now();
+
+  return {
+    id: deal.id,
+
+    name: deal.product_name,
+
+    image: DEFAULT_IMAGE,
+
+    originalPrice,
+
+    groupPrice,
+
+    joined: Number(deal.participant_count ?? 0),
+
+    required: Number(deal.minimum_buyers),
+
+    daysLeft: Number.isFinite(remaining)
+      ? Math.max(
+          0,
+          Math.ceil(remaining / 86400000)
+        )
+      : 0,
+
+    discount:
+      originalPrice > 0
+        ? Math.round(
+            ((originalPrice - groupPrice) /
+              originalPrice) *
+              100
+          )
+        : 0,
+  };
+}
+
+
+// ==========================================
+// HOME DEAL CARD
+// ==========================================
+
 function DealCard({ deal }) {
-  const progress = Math.min(
-    (deal.joined / deal.required) * 100,
-    100
-  );
+  const progress =
+    deal.required > 0
+      ? Math.min(
+          Math.round(
+            (deal.joined / deal.required) * 100
+          ),
+          100
+        )
+      : 0;
 
   return (
     <article className="home-deal-card">
+
       <div className="home-deal-image-wrap">
-        <img src={deal.image} alt={deal.name} />
+
+        <img
+          src={deal.image}
+          alt={`${deal.name} placeholder`}
+          loading="lazy"
+        />
 
         <span className="home-discount">
           -{deal.discount}%
@@ -126,46 +151,59 @@ function DealCard({ deal }) {
           <Clock3 size={13} />
           {deal.daysLeft} days left
         </span>
+
       </div>
 
       <div className="home-deal-content">
-        <div className="home-deal-topline">
-          <span>{deal.category}</span>
 
-          <span className="home-rating">
-            <Star size={13} fill="currentColor" />
-            {deal.rating}
-          </span>
+        <div className="home-deal-topline">
+          <span>Group Deal</span>
         </div>
 
         <h3>{deal.name}</h3>
 
         <div className="home-deal-prices">
-          <strong>{formatPrice(deal.groupPrice)}</strong>
-          <del>{formatPrice(deal.originalPrice)}</del>
+
+          <strong>
+            {formatPrice(deal.groupPrice)}
+          </strong>
+
+          <del>
+            {formatPrice(deal.originalPrice)}
+          </del>
+
         </div>
 
         <div className="home-progress-label">
+
           <span>
             <Users size={14} />
             {deal.joined} / {deal.required} joined
           </span>
 
-          <span>{Math.round(progress)}%</span>
+          <span>{progress}%</span>
+
         </div>
 
         <div
           className="home-progress-track"
           role="progressbar"
-          aria-valuenow={deal.joined}
+          aria-valuenow={Math.min(
+            deal.joined,
+            deal.required
+          )}
           aria-valuemin={0}
           aria-valuemax={deal.required}
           aria-label={`${deal.name} buyers joined`}
         >
+
           <div
             className="home-progress-fill"
-            style={{ width: `${progress}%` }}
+            style={{
+              width: `${progress}%`,
+            }}
           />
+
         </div>
 
         <Link
@@ -175,19 +213,102 @@ function DealCard({ deal }) {
           View Deal
           <ArrowRight size={16} />
         </Link>
+
       </div>
+
     </article>
   );
 }
 
+
+// ==========================================
+// HOME PAGE
+// ==========================================
+
 export default function Home() {
+
+  const [trendingDeals, setTrendingDeals] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+
+  // ========================================
+  // LOAD REAL DEALS FROM BACKEND
+  // ========================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDeals() {
+      try {
+        setLoading(true);
+        setLoadError("");
+
+        const data = await getDeals();
+
+        const activeDeals = data
+          .filter(
+            (deal) =>
+              deal.status === "ACTIVE" &&
+              new Date(deal.deadline).getTime() >
+                Date.now()
+          )
+          .slice(0, 4)
+          .map(mapBackendDeal);
+
+        if (!cancelled) {
+          setTrendingDeals(activeDeals);
+        }
+
+      } catch (error) {
+
+        console.error(
+          "Unable to load home deals:",
+          error
+        );
+
+        if (!cancelled) {
+          setLoadError(
+            "Unable to load deals right now. Please try again later."
+          );
+        }
+
+      } finally {
+
+        if (!cancelled) {
+          setLoading(false);
+        }
+
+      }
+    }
+
+    loadDeals();
+
+    return () => {
+      cancelled = true;
+    };
+
+  }, []);
+
+
   return (
     <main>
-      {/* HERO SECTION */}
+
+      {/* =====================================
+          HERO SECTION
+      ===================================== */}
 
       <section className="home-hero">
+
         <div className="home-hero-container">
+
           <div className="home-hero-content">
+
             <div className="home-hero-badge">
               <ShoppingBag size={15} />
               SMART GROUP SHOPPING
@@ -200,12 +321,13 @@ export default function Home() {
             </h1>
 
             <p>
-              Discover amazing deals, shop with your
-              community and unlock unbeatable group
-              prices on products you love.
+              Discover group deals, shop with your
+              community and unlock better prices
+              on products you love.
             </p>
 
             <div className="home-hero-actions">
+
               <Link
                 to="/deals"
                 className="home-primary-button"
@@ -220,65 +342,74 @@ export default function Home() {
               >
                 How It Works
               </Link>
+
             </div>
 
-            <div className="home-hero-stats">
-              <div>
-                <strong>2,500+</strong>
-                <span>Happy Shoppers</span>
-              </div>
-
-              <div>
-                <strong>500+</strong>
-                <span>Group Deals</span>
-              </div>
-
-              <div>
-                <strong>30%</strong>
-                <span>Average Savings</span>
-              </div>
-            </div>
           </div>
 
+
+          {/* HERO IMAGE */}
+
           <div className="home-hero-visual">
+
             <div className="home-hero-image-frame">
+
               <img
                 src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1100&q=90"
                 alt="Fashion shopping collection"
               />
+
             </div>
 
             <div className="home-floating-card home-floating-top">
+
               <span className="home-floating-icon">
                 <Users size={19} />
               </span>
 
               <div>
                 <strong>Shop Together</strong>
-                <small>Better prices for everyone</small>
+                <small>
+                  Better prices for everyone
+                </small>
               </div>
+
             </div>
 
             <div className="home-floating-card home-floating-bottom">
+
               <span className="home-floating-icon pink">
                 <BadgePercent size={20} />
               </span>
 
               <div>
-                <strong>Save up to 40%</strong>
-                <small>With exclusive group deals</small>
+                <strong>Group Discounts</strong>
+                <small>
+                  Join a deal to save
+                </small>
               </div>
+
             </div>
+
           </div>
+
         </div>
+
       </section>
 
-      {/* BENEFITS */}
+
+      {/* =====================================
+          BENEFITS SECTION
+      ===================================== */}
 
       <section className="home-benefits">
+
         <div className="home-section-container">
+
           <div className="home-benefits-grid">
+
             {benefits.map((benefit) => {
+
               const Icon = benefit.icon;
 
               return (
@@ -286,38 +417,61 @@ export default function Home() {
                   key={benefit.title}
                   className="home-benefit"
                 >
+
                   <div className="home-benefit-icon">
-                    <Icon size={24} strokeWidth={2} />
+
+                    <Icon
+                      size={24}
+                      strokeWidth={2}
+                    />
+
                   </div>
 
                   <div>
+
                     <h3>{benefit.title}</h3>
+
                     <p>{benefit.description}</p>
+
                   </div>
+
                 </div>
               );
+
             })}
+
           </div>
+
         </div>
+
       </section>
 
-      {/* TRENDING DEALS */}
+
+      {/* =====================================
+          LATEST GROUP DEALS
+      ===================================== */}
 
       <section className="home-trending">
+
         <div className="home-section-container">
+
           <div className="home-section-heading">
+
             <div>
+
               <span className="home-section-eyebrow">
                 DON'T MISS OUT
               </span>
 
               <h2>
-                Trending <span>Group Deals</span>
+                Latest <span>Group Deals</span>
               </h2>
 
               <p>
-                Join popular deals before time runs out.
+                Explore available deals before
+                their deadlines.
               </p>
+
             </div>
 
             <Link
@@ -327,37 +481,95 @@ export default function Home() {
               View All Deals
               <ArrowRight size={18} />
             </Link>
+
           </div>
 
-          <div className="home-deals-grid">
-            {trendingDeals.map((deal) => (
-              <DealCard key={deal.id} deal={deal} />
-            ))}
-          </div>
+
+          {/* DEALS LOADING / ERROR / EMPTY */}
+
+          {loading ? (
+
+            <p role="status">
+              Loading deals...
+            </p>
+
+          ) : loadError ? (
+
+            <p role="alert">
+
+              <Info
+                size={16}
+                style={{
+                  verticalAlign: "middle",
+                }}
+              />
+
+              {" "}
+              {loadError}
+
+            </p>
+
+          ) : trendingDeals.length === 0 ? (
+
+            <p>
+              No active deals available yet.
+              Check back soon.
+            </p>
+
+          ) : (
+
+            <div className="home-deals-grid">
+
+              {trendingDeals.map((deal) => (
+
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                />
+
+              ))}
+
+            </div>
+
+          )}
+
         </div>
+
       </section>
 
-      {/* BOTTOM CALL TO ACTION */}
+
+      {/* =====================================
+          BOTTOM CTA SECTION
+      ===================================== */}
 
       <section className="home-cta-section">
+
         <div className="home-cta">
+
           <div>
+
             <h2>
               Ready to start saving?
             </h2>
 
             <p>
-              Discover the power of buying together
-              with BulkBuddy.
+              Discover the power of buying
+              together with BulkBuddy.
             </p>
+
           </div>
 
           <Link to="/register">
+
             Join BulkBuddy
             <ArrowRight size={18} />
+
           </Link>
+
         </div>
+
       </section>
+
     </main>
   );
 }

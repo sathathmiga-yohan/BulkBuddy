@@ -115,8 +115,24 @@
   font-weight: 800;
 }
 
-.bb-seller-sidebar-bottom > a {
+.bb-seller-sidebar-bottom > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: #d83c77;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bb-seller-sidebar-bottom > button:hover {
+  background: #fff0f6;
 }
 
 .bb-seller-content {

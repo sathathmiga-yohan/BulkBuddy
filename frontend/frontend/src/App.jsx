@@ -99,8 +99,6 @@ export default function App() {
           }
         />
 
-        {/* SELLER PAGES */}
-
         <Route
           path="/seller/dashboard"
           element={

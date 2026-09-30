@@ -1,6 +1,10 @@
 
-import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { useState, useEffect } from "react";
+import {Outlet, NavLink, useNavigate  } from "react-router-dom";
+import {
+  getCurrentUser,
+  logoutUser,
+} from "../../../services/authservice.js";
 import {
   BarChart3, FileSpreadsheet, LayoutDashboard,
   LogOut, Menu, Package, Plus, Settings,
@@ -19,6 +23,36 @@ const links = [
 
 export default function SellerLayout({ title, children }) {
   const [open, setOpen] = useState(false);
+
+  const navigate = useNavigate();
+  const [sellerName, setSellerName] = useState("Seller");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSeller = async () => {
+      try {
+        const user = await getCurrentUser();
+
+        if (!cancelled) {
+          setSellerName(user.name || "Seller");
+        }
+      } catch (error) {
+        console.error("Unable to load seller:", error);
+      }
+    };
+
+    loadSeller();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <main className="bb-seller-page">
@@ -70,13 +104,14 @@ export default function SellerLayout({ title, children }) {
             <div className="bb-seller-user">
               <span className="bb-seller-avatar">S</span>
               <div>
-                <strong>Demo Seller</strong>
+                <strong>{sellerName}</strong>
                 <small>Seller Account</small>
               </div>
             </div>
-            <Link to="/login">
-              <LogOut size={18} /> Logout (Demo)
-            </Link>
+            <button type="button" onClick={handleLogout}>
+              <LogOut size={18} />
+              Logout
+            </button>
           </div>
         </aside>
 

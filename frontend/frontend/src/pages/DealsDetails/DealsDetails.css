@@ -252,7 +252,7 @@
 
 .detail-progress-numbers {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -607,6 +607,28 @@
   gap: 7px;
   color: #6034d9;
   font-weight: 700;
+}
+
+/* Error Message */
+.detail-join-message[role="alert"] {
+  background: #fff0f0;
+  color: #d92d20;
+}
+
+/* Button States */
+.detail-join-button:not(:disabled),
+.detail-wishlist-button:not(:disabled) {
+  cursor: pointer;
+}
+
+.detail-join-button:disabled,
+.detail-wishlist-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+} 
+
+.detail-actions {
+  grid-template-columns: 1fr;
 }
 
 /* RESPONSIVE */

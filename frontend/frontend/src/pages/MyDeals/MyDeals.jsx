@@ -15,7 +15,8 @@ import {
 
 import { formatPrice } from "../../data/mockDeals.js";
 
-import { getCurrentUser, logoutUser } from "../../services/authservice";import { getDealById } from "../../services/dealservice";
+import { getCurrentUser, logoutUser } from "../../services/authservice"; 
+import { getDealById } from "../../services/dealservice";
 import { getMyParticipations } from "../../services/participationservice";
 
 import "./MyDeals.css";
@@ -188,7 +189,7 @@ export default function MyDeals() {
   };
 
   const handleLogout = () => {
-    logout();
+    logoutUser();
     navigate("/login", { replace: true });
   };
 
@@ -361,7 +362,7 @@ export default function MyDeals() {
                       {value === "all"
                         ? "All Deals"
                         : value[0].toUpperCase() +
-                          value.slice(1)}
+                        value.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -462,12 +463,12 @@ export default function MyDeals() {
                               {status === "active"
                                 ? "Participation active"
                                 : status === "waiting"
-                                ? "On waiting list"
-                                : status === "successful"
-                                ? "Deal successful"
-                                : status === "failed"
-                                ? "Deal failed"
-                                : "Participation cancelled"}
+                                  ? "On waiting list"
+                                  : status === "successful"
+                                    ? "Deal successful"
+                                    : status === "failed"
+                                      ? "Deal failed"
+                                      : "Participation cancelled"}
                             </span>
 
                             <Link

@@ -478,7 +478,7 @@ export default function CsvImport() {
 
           <button
             type="button"
-            onClick={() => setResult(null)}
+            onClick={reset}
             aria-label="Dismiss"
           >
             <X size={18} />

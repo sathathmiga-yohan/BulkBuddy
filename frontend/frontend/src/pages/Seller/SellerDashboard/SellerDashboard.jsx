@@ -16,8 +16,10 @@ import {
 
 import SellerLayout from "./SellerLayout.jsx";
 
-import { getSellerDeals } from "../../../services/dealservice.js";
-import { getCurrentUser } from "../../../services/authservice.js";
+import {
+  getSellerDeals,
+  getSellerDealParticipants,
+} from "../../../services/dealservice.js"; import { getCurrentUser } from "../../../services/authservice.js";
 
 import { formatPrice } from "../../../data/mockDeals.js";
 
@@ -28,6 +30,7 @@ export default function SellerDashboard() {
   const [status, setStatus] = useState("all");
 
   const [sellerDeals, setSellerDeals] = useState([]);
+  const [participantCounts, setParticipantCounts] = useState({});
   const [sellerName, setSellerName] = useState("Seller");
 
   const [loading, setLoading] = useState(true);
@@ -47,9 +50,36 @@ export default function SellerDashboard() {
           getSellerDeals(),
         ]);
 
+        const ownDeals = Array.isArray(deals) ? deals : [];
+
+        const results = await Promise.allSettled(
+          ownDeals.map(async (deal) => {
+            const response = await getSellerDealParticipants(deal.id);
+
+            const joinedCount = (response.participants || []).filter(
+              (participant) =>
+                String(participant.status).toUpperCase() === "JOINED"
+            ).length;
+
+            return {
+              dealId: deal.id,
+              count: joinedCount,
+            };
+          })
+        );
+
+        const countsByDeal = {};
+
+        results.forEach((result) => {
+          if (result.status === "fulfilled") {
+            countsByDeal[result.value.dealId] = result.value.count;
+          }
+        });
+
         if (!cancelled) {
           setSellerName(user.name || "Seller");
-          setSellerDeals(Array.isArray(deals) ? deals : []);
+          setSellerDeals(ownDeals);
+          setParticipantCounts(countsByDeal);
         }
       } catch (err) {
         console.error("Seller dashboard error:", err);
@@ -110,6 +140,15 @@ export default function SellerDashboard() {
       String(deal.status).toUpperCase() === "SUCCESSFUL"
   ).length;
 
+  const totalParticipants = sellerDeals.every(
+    (deal) => participantCounts[deal.id] !== undefined
+  )
+    ? sellerDeals.reduce(
+      (sum, deal) => sum + participantCounts[deal.id],
+      0
+    )
+    : "—";
+
   const cards = [
     {
       label: "Total Deals",
@@ -128,7 +167,7 @@ export default function SellerDashboard() {
     },
     {
       label: "Total Participants",
-      value: "—",
+      value: totalParticipants,
       icon: Users,
     },
   ];
@@ -306,7 +345,9 @@ export default function SellerDashboard() {
                         </td>
 
                         <td>
-                          <span>—</span>
+                          <span>
+                            {participantCounts[deal.id] ?? "—"} / {deal.minimum_buyers}
+                          </span>
                         </td>
 
                         <td>

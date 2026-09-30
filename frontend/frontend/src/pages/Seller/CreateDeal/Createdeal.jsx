@@ -372,7 +372,7 @@ export default function Createdeal() {
 
       {/* BACKEND ERROR */}
       {apiError && (
-        <div className="cd-success" role="alert">
+        <div className="cd-api-error" role="alert">
           <Info size={22} />
 
           <div>

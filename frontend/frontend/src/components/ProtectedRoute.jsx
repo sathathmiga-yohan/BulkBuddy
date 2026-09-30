@@ -48,7 +48,7 @@ export default function ProtectedRoute({
     };
 
     checkAuthentication();
-
+// 
     return () => {
       cancelled = true;
     };

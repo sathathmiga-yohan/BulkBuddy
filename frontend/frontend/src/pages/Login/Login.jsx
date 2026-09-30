@@ -82,7 +82,6 @@ export default function Login() {
       // 3. Fetch logged-in user details
       const user = await getCurrentUser();
 
-      // 4. Navigate based on role
       if (user.role === "SELLER") {
         navigate("/seller/dashboard", { replace: true });
       } else {

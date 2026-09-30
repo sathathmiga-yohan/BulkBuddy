@@ -1,8 +1,4 @@
 
-/* ================================
-   BULKBUDDY NAVBAR - PURPLE THEME
-================================ */
-
 .navbar {
   position: sticky;
   top: 0;
@@ -422,6 +418,27 @@
     color: white;
   }
 }
+
+
+/* NAVBAR BUTTON CURSORS */
+
+.navbar-search button,
+.navbar-menu-button,
+.navbar-signup,
+.navbar-mobile-search button,
+.navbar-mobile-signup {
+  cursor: pointer;
+}
+
+/* MOBILE MENU HEIGHT */
+
+@media (max-width: 900px) {
+  .navbar-mobile {
+    max-height: calc(100vh - 65px);
+    overflow-y: auto;
+  }
+}
+
 
 @media (max-width: 380px) {
   .navbar-brand-name {

@@ -60,8 +60,7 @@ function mapBackendDeal(deal) {
           ((normalPrice - groupPrice) / normalPrice) * 100
         )
         : 0,
-    joined: 0,
-    required: Number(deal.minimum_buyers),
+    joined: Number(deal.participant_count ?? 0), required: Number(deal.minimum_buyers),
     daysLeft,
     rating: null,
   };

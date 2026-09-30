@@ -112,7 +112,6 @@ export default function DealDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [isFavourite, setIsFavourite] = useState(false);
   const [activeTab, setActiveTab] = useState("description");
 
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -199,6 +198,16 @@ export default function DealDetails() {
     };
   }, [id]);
 
+  // Refresh deal information after Join / Leave
+  const refreshDeal = async () => {
+    try {
+      const updatedDeal = await getDealById(id);
+      setDeal(updatedDeal);
+    } catch (error) {
+      console.error("Unable to refresh deal:", error);
+    }
+  };
+
   const handleDeliveryChange = (event) => {
     const { name, value } = event.target;
 
@@ -242,6 +251,8 @@ export default function DealDetails() {
       setParticipation(result);
       setShowJoinForm(false);
 
+      await refreshDeal();
+
       setActionMessage(
         result.status === "WAITING"
           ? "You have been added to the waiting list."
@@ -265,6 +276,7 @@ export default function DealDetails() {
       const result = await leaveDeal(id);
 
       setParticipation(result);
+      await refreshDeal();
       setActionMessage(
         "You have successfully left this deal."
       );
@@ -308,8 +320,8 @@ export default function DealDetails() {
   const discount =
     normalPrice > 0
       ? Math.round(
-          ((normalPrice - groupPrice) / normalPrice) * 100
-        )
+        ((normalPrice - groupPrice) / normalPrice) * 100
+      )
       : 0;
 
   const deadline = new Date(deal.deadline);
@@ -500,27 +512,6 @@ export default function DealDetails() {
                 </button>
               )}
 
-              <button
-                type="button"
-                className={`detail-wishlist-button ${
-                  isFavourite ? "active" : ""
-                }`}
-                onClick={() =>
-                  setIsFavourite((current) => !current)
-                }
-                aria-pressed={isFavourite}
-              >
-                <Heart
-                  size={19}
-                  fill={
-                    isFavourite ? "currentColor" : "none"
-                  }
-                />
-
-                {isFavourite
-                  ? "Wishlisted"
-                  : "Add to Wishlist"}
-              </button>
             </div>
 
             {/* DELIVERY FORM FOR JOIN / REJOIN */}
