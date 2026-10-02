@@ -3,7 +3,7 @@ import axios from "axios";
 
 // “நம்ம frontend API request எல்லாம் இந்த backend address-க்கு அனுப்பு”
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: import.meta.env.VITE_BACKEND_URL, // backend URL-ஐ environment variable-ல இருந்து எடுக்குறோம்
 });
 
 api.interceptors.request.use(
