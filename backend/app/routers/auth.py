@@ -27,6 +27,12 @@ from app.schemas.token import TokenResponse
 
 # AUTH ROUTER
 
+# 1. புதுசா account create பண்ணணும்  → /auth/register
+# 2. Account-க்கு login பண்ணணும்      → /auth/login
+# 3. Login ஆன பிறகு "நான் யார்?"
+#    details பார்க்கணும்               → /auth/me
+
+
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]

@@ -48,12 +48,15 @@ router = APIRouter(
     response_model=list[DealResponse]
 )
 def get_all_deals(
+    # atabase-கிட்ட பேச ஒரு DB session வாங்குது.
     db: Session = Depends(get_db)
 ):
 
     deals = db.scalars(
         select(Deal).order_by(
+            # புதுசா create ஆன Deal முதலில் வரட்டும்.
             Deal.created_at.desc(),
+            # → ஒரே created time இருந்தால் பெரிய/latest ID முதலில் வரட்டும்.
             Deal.id.desc()
         )
     ).all()

@@ -437,8 +437,8 @@ export default function Createdeal() {
                 )}
 
                 <small>
-                  Category is shown in this form only.
-                  The current Backend does not save categories.
+                  {/* Category is shown in this form only.
+                  The current Backend does not save categories. */}
                 </small>
               </label>
 

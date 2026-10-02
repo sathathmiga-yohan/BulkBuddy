@@ -20,10 +20,47 @@ from app.utils.datetime_utils import (
     normalize_datetime,
 )
 
+# get_participant_count()
+#         ↓
+# JOINED customers எத்தனை பேர்?
+
+# get_waiting_count()
+#         ↓
+# WAITING customers எத்தனை பேர்?
+
+# get_deal_or_404()
+#         ↓
+# Deal இருக்கா? இல்லனா 404
+
+# validate_seller_ownership()
+#         ↓
+# இந்த deal இந்த seller-க்கு சொந்தமா?
+
+# validate_deal_is_open()
+#         ↓
+# Deal ACTIVE-ஆ + deadline முடியலையா?
+
+# validate_deal_values()
+#         ↓
+# Price, min/max quantity, deadline சரியா?
+
+# validate_deal_update()
+#         ↓
+# இந்த changes update பண்ண allowed-ஆ?
+
+# validate_deal_deletion()
+#         ↓
+# இந்த deal delete பண்ண allowed-ஆ?
+
+# build_deal_response()
+#         ↓
+# Frontend-க்கு அனுப்ப Deal response தயார் பண்ணு
 
 # ==========================================
 # GET JOINED PARTICIPANT COUNT
 # ==========================================
+
+# ஒரு Deal-ல் JOINED status-ல எத்தனை participants இருக்காங்கன்னு count பண்ணி return பண்ணுவது.
 
 def get_participant_count(
     db: Session,

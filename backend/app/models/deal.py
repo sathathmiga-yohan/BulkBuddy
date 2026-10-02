@@ -97,7 +97,7 @@ class Deal(Base):
     )
 
     # DATABASE CONSTRAINTS
-
+    # ithu database  ku conditions kudukkuthu
     __table_args__ = (
         CheckConstraint(
             "normal_price > 0",

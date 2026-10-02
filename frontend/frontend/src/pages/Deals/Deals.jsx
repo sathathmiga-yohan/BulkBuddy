@@ -1,6 +1,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { getDeals } from "../../services/dealservice";
+
 
 import {
   Search,
@@ -22,7 +24,6 @@ import {
   formatPrice,
 } from "../../data/mockDeals.js";
 
-import { getDeals } from "../../services/dealservice";
 
 import "./Deals.css";
 
@@ -189,6 +190,7 @@ function DealCard({ deal, isFavourite, onFavourite }) {
 }
 
 export default function Deals() {
+  // Backend-லிருந்து வந்த deals frontend-ல இங்க store ஆகுது.
   const [sharedDeals, setSharedDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -202,10 +204,13 @@ export default function Deals() {
         setLoading(true);
         setLoadError("");
 
+        // Backend-லிருந்து எல்லா deals-ஐயும் வாங்குகிறது
         const data = await getDeals();
 
         if (!cancelled) {
+          // அந்த deals-ஐ frontend state-ல் store பண்ணுது
           setSharedDeals(
+            //  // Backend-லிருந்து வந்த ஒவ்வொரு deal-ஐயும் frontend format-க்கு மாற்றுகிறது
             data.map(mapBackendDeal)
           );
         }

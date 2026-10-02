@@ -118,7 +118,6 @@ export default function Register() {
 
       setSuccess(true);
 
-      // Registration does not return a JWT.
       // Sign in using the new account.
       navigate("/login", { replace: true });
 

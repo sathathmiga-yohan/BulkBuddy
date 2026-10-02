@@ -1,4 +1,4 @@
-
+# security.py எழுதினது user password-ஐ பாதுகாப்பாக handle பண்ண, login ஆன user-ஐ JWT மூலம் identify பண்ண, CUSTOMER/SELLER/ADMIN permission control பண்ண.
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -18,7 +18,8 @@ from app.database import get_db
 from app.models.user import User, UserRole
 
 # PASSWORD HASHING
-
+# Register பண்ணும்போது → password-ஐ hash பண்ணும்.
+# Login பண்ணும்போது → user கொடுத்த password correct-ஆ என்று verify பண்ணும்.
 password_hash = PasswordHash.recommended()
 
 
@@ -26,24 +27,30 @@ def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
 
+# plain password User இப்ப login form-ல் type பண்ணிய password
+# hashed password Database-ல் ஏற்கனவே save ஆகி இருக்கும் hash
+
 def verify_password(
     plain_password: str,
     hashed_password: str
 ) -> bool:
 
     return password_hash.verify(
-        plain_password,
+        plain_password, 
         hashed_password
     )
 
 # OAUTH2 SCHEME
-
+# protected API request வரும்போது Authorization header-ல இருக்கிற Bearer token-ஐ எடுத்துத் தருவது.
 oauth2_scheme = OAuth2PasswordBearer(
+# User token பெற வேண்டுமென்றால் நம்ம authentication login endpoint /auth/login
     tokenUrl="/auth/login"
 )
 
 # CREATE ACCESS TOKEN
+# Login ஆன user-ன் ID மற்றும் token expiry time-ஐ payload-ல் வைத்து, secret key + algorithm பயன்படுத்தி signed JWT access token உருவாக்கி return செய்கிறது.
 
+# Login ஆன user யார் என்பதை அடுத்த protected API requests-ல் கண்டுபிடிக்க temporary JWT token உருவாக்குகிறது.
 def create_access_token(user_id: int) -> str:
 
     expire = datetime.now(timezone.utc) + timedelta(
@@ -64,7 +71,7 @@ def create_access_token(user_id: int) -> str:
     return encoded_token
 
 # GET CURRENT USER
-
+# get_current_user() = “இந்த token அனுப்பிய logged-in user யார்?” என்று கண்டுபிடிக்கும் function.
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)

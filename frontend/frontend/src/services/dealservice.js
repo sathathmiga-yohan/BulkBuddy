@@ -24,11 +24,10 @@ export const getSellerDeals = async () => {
     return response.data;
 };
 
+// Seller: Update own deal
 export const updateDeal = async (dealId, dealData) => {
     const response = await api.patch(
-        `/deals/${dealId}`,
-        dealDatawwwww
-    );
+        `/deals/${dealId}`,dealData);
 
     return response.data;
 };
@@ -53,7 +52,7 @@ export const importDealsCsv = async (file) => {
     return response.data;
 };
 
-
+// Seller: Get participants of a specific deal
 export const getSellerDealParticipants = async (dealId) => {
     const response = await api.get(
         `/participations/seller/deals/${dealId}`

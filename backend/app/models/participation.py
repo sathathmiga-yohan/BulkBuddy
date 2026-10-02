@@ -98,6 +98,9 @@ class Participation(Base):
 
     # DATABASE CONSTRAINTS
 
+
+# ithu duplicate varakoodanu
+# ithu duplicate joinaakama iruka condition podrea
     __table_args__ = (
         UniqueConstraint(
             "deal_id",
